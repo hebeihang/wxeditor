@@ -206,6 +206,10 @@ function initEditor() {
         const selected = editor.getSelection()
         editor.replaceSelection(`[${selected}]()`)
       },
+      [`${ctrlKey}-P`]: function insertImage(editor) {
+        const selected = editor.getSelection()
+        editor.replaceSelection(`![${selected}]()`);
+      },
       [`${ctrlKey}-E`]: function code(editor) {
         const selected = editor.getSelection()
         editor.replaceSelection(`\`${selected}\``)

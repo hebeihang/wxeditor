@@ -34,6 +34,11 @@ const formatItems = [
     emitArgs: [`addFormat`, `${ctrlKey}-K`],
   },
   {
+    label: `插入图片`,
+    kbd: [ctrlSign, `P`],
+    emitArgs: [`addFormat`, `${ctrlKey}-P`],
+  },
+  {
     label: `行内代码`,
     kbd: [ctrlSign, `E`],
     emitArgs: [`addFormat`, `${ctrlKey}-E`],
