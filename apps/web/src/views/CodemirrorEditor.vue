@@ -678,6 +678,7 @@ onUnmounted(() => {
       @start-copy="startCopy"
       @end-copy="endCopy"
     />
+    <EditorToolbar />
 
     <main class="container-main flex flex-1 flex-col">
       <div

@@ -66,6 +66,7 @@ export const useUIStore = defineStore(`ui`, () => {
   // AI 对话框
   const aiDialogVisible = ref(false)
   const aiImageDialogVisible = ref(false)
+  const aiPrefillInput = ref('')
 
   function toggleAIDialog(value?: boolean) {
     aiDialogVisible.value = value ?? !aiDialogVisible.value
@@ -73,6 +74,14 @@ export const useUIStore = defineStore(`ui`, () => {
 
   function toggleAIImageDialog(value?: boolean) {
     aiImageDialogVisible.value = value ?? !aiImageDialogVisible.value
+  }
+
+  function setAIPrefillInput(text: string) {
+    aiPrefillInput.value = text
+  }
+
+  function clearAIPrefillInput() {
+    aiPrefillInput.value = ''
   }
 
   // 搜索面板状态
@@ -129,6 +138,9 @@ export const useUIStore = defineStore(`ui`, () => {
     toggleAIDialog,
     aiImageDialogVisible,
     toggleAIImageDialog,
+    aiPrefillInput,
+    setAIPrefillInput,
+    clearAIPrefillInput,
 
     // ==================== 搜索面板 ====================
     searchTabRequest,

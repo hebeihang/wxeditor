@@ -43,7 +43,8 @@
     "prettier": "2.8.8",
     "shx": "^0.4.0",
     "simple-git-hooks": "^2.13.1",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "vue-tsc": "^2.1.6"
   },
   "pnpm": {
     "overrides": {

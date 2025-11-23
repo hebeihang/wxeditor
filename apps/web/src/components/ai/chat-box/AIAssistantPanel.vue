@@ -80,6 +80,24 @@ const AIConfigStore = useAIConfigStore()
 const { apiKey, endpoint, model, temperature, maxToken, type } = storeToRefs(AIConfigStore)
 
 const quickCmdStore = useQuickCommands()
+const { aiPrefillInput } = storeToRefs(uiStore)
+
+watch(aiPrefillInput, (val) => {
+  if (val && typeof val === 'string') {
+    dialogVisible.value = true
+    input.value = val
+    uiStore.clearAIPrefillInput()
+    nextTick(() => {
+      const textarea = document.querySelector(
+        `textarea[placeholder*="说些什么" ]`,
+      ) as HTMLTextAreaElement | null
+      textarea?.focus()
+      if (textarea) {
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+      }
+    })
+  }
+})
 
 function getSelectedText(): string {
   try {
