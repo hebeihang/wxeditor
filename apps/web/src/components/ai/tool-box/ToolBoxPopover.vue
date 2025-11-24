@@ -486,7 +486,7 @@ function buildActionPrompt(inputText: string): string {
       const style = getStyleLabel(continueStyleId.value)
       const tone = getToneLabel(continueToneId.value)
       const strict = snapToExistingContext.value ? '严格衔接现有上下文。' : ''
-      const base = `请从当前文本结尾继续写（模式：${continueMode.value}，目标：${wordsOrParagraphs.value}），风格：${style}，情感：${tone}。优先保持语境连贯。${strict}输出 Markdown。\n\n文本：\n${inputText}`
+      const base = `请从当前文本结尾继续写（模式：${continueMode.value}，目标：${wordsOrParagraphs.value}），风格：${style}，情感：${tone}。优先保持语境连贯。${strict}输出 Markdown。严格的排版要求：标题应独占一行，标题后需空一行再写正文；段落之间用空行分隔；不要把标题和正文写在同一行。\n\n文本：\n${inputText}`
       return `${base}${extra}`
     }
     case 'outline': {
@@ -514,7 +514,8 @@ function stopAI() {
 function replaceText() {
   const editorView = toRaw(editorStore.editor!)!
   const sel = editorView.state.selection.main
-  const content = (replacementText.value || message.value)
+  let content = (replacementText.value || message.value)
+  content = normalizeMarkdown(content)
   const to = sel.to
   const from = sel.from
 
@@ -604,6 +605,14 @@ function buildDiffHtml(a: string, b: string): string {
 }
 
 export { buildDiffHtml }
+
+function normalizeMarkdown(text: string): string {
+  let s = text
+  s = s.replace(/(^|\n)(\s{0,3}#{1,6}\s+[^\n]+)(?!\n)/g, `$1$2\n\n`)
+  s = s.replace(/(^|\n)([-*+]\s+[^\n]+)(?!\n)/g, `$1$2\n`)
+  s = s.replace(/\n{3,}/g, `\n\n`)
+  return s
+}
 </script>
 
 <template>
