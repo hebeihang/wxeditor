@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useQuickCommands } from '@/stores/quickCommands'
 
 /* ---------- 弹窗开关 ---------- */
-const props = defineProps<{ open: boolean }>()
+const props = defineProps<{ open: boolean, mode?: 'all' | 'title' }>()
 const emit = defineEmits([`update:open`])
 
 const dialogOpen = ref(props.open)
@@ -16,13 +16,19 @@ watch(dialogOpen, v => emit(`update:open`, v))
 
 /* ---------- store & 新增 ---------- */
 const store = useQuickCommands()
+const mode = computed(() => props.mode ?? 'all')
 const label = ref(``)
 const template = ref(``)
 
 function addCmd() {
   if (!label.value.trim() || !template.value.trim())
     return
-  store.add(label.value.trim(), template.value.trim())
+  const lbl = label.value.trim()
+  const tpl = template.value.trim()
+  if (mode.value === 'title')
+    store.add(lbl, tpl, `title-style:${crypto.randomUUID()}`)
+  else
+    store.add(lbl, tpl)
   label.value = ``
   template.value = ``
 }
@@ -60,7 +66,7 @@ function saveEdit() {
       <!-- 列表：独立滚动区域 -->
       <div class="space-y-4 flex-1 overflow-y-auto pr-1">
         <div
-          v-for="cmd in store.commands"
+          v-for="cmd in store.commands.filter(c => mode === 'title' ? c.id.startsWith('title-style:') || c.id === 'title-suggest' : true)"
           :key="cmd.id"
           class="flex flex-col gap-2 border rounded-md p-3"
         >

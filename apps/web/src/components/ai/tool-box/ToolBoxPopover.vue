@@ -664,7 +664,9 @@ export { buildDiffHtml }
 
         <div v-if="selectedAction === 'continue'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <div class="mb-1 text-sm font-medium">延续文风</div>
+            <div class="mb-1 text-sm font-medium">
+              延续文风
+            </div>
             <Select v-model="continueStyleId">
               <SelectTrigger class="w-full">
                 <SelectValue placeholder="选择文风" />
@@ -679,7 +681,9 @@ export { buildDiffHtml }
             </Select>
           </div>
           <div>
-            <div class="mb-1 text-sm font-medium">情感（可选）</div>
+            <div class="mb-1 text-sm font-medium">
+              情感（可选）
+            </div>
             <Select v-model="continueToneId">
               <SelectTrigger class="w-full">
                 <SelectValue placeholder="选择情感（可选）" />
@@ -697,22 +701,32 @@ export { buildDiffHtml }
             </Select>
           </div>
           <div>
-            <div class="mb-1 text-sm font-medium">续写模式</div>
+            <div class="mb-1 text-sm font-medium">
+              续写模式
+            </div>
             <Select v-model="continueMode">
               <SelectTrigger class="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="字数限制">字数限制</SelectItem>
-                  <SelectItem value="段落数量">段落数量</SelectItem>
-                  <SelectItem value="情节推进">情节推进</SelectItem>
+                  <SelectItem value="字数限制">
+                    字数限制
+                  </SelectItem>
+                  <SelectItem value="段落数量">
+                    段落数量
+                  </SelectItem>
+                  <SelectItem value="情节推进">
+                    情节推进
+                  </SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <div class="mb-1 text-sm font-medium">目标（字数或段落）</div>
+            <div class="mb-1 text-sm font-medium">
+              目标（字数或段落）
+            </div>
             <input v-model.number="wordsOrParagraphs" type="number" min="20" max="5000" class="w-full bg-transparent border rounded px-2 py-1 text-sm">
           </div>
           <div class="flex items-center gap-2">
@@ -723,7 +737,9 @@ export { buildDiffHtml }
 
         <div v-if="selectedAction === 'outline'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <div class="mb-1 text-sm font-medium">目标文风</div>
+            <div class="mb-1 text-sm font-medium">
+              目标文风
+            </div>
             <Select v-model="outlineStyleId">
               <SelectTrigger class="w-full">
                 <SelectValue placeholder="选择文风" />
@@ -738,11 +754,15 @@ export { buildDiffHtml }
             </Select>
           </div>
           <div>
-            <div class="mb-1 text-sm font-medium">大纲深度（1=章节,2=小节）</div>
+            <div class="mb-1 text-sm font-medium">
+              大纲深度（1=章节,2=小节）
+            </div>
             <input v-model.number="outlineLevels" type="number" min="1" max="4" class="w-full bg-transparent border rounded px-2 py-1 text-sm">
           </div>
           <div>
-            <div class="mb-1 text-sm font-medium">目标章节数</div>
+            <div class="mb-1 text-sm font-medium">
+              目标章节数
+            </div>
             <input v-model.number="outlineTargetSections" type="number" min="1" max="20" class="w-full bg-transparent border rounded px-2 py-1 text-sm">
           </div>
           <div class="flex items-center gap-2">

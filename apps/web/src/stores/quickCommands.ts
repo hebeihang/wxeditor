@@ -138,9 +138,9 @@ export const useQuickCommands = defineStore(`quickCommands`, () => {
   }
 
   // ---------- CRUD ----------
-  function add(label: string, template: string) {
-    const id = crypto.randomUUID()
-    commands.value.push(hydrate({ id, label, template }))
+  function add(label: string, template: string, id?: string) {
+    const finalId = id && id.trim().length > 0 ? id : crypto.randomUUID()
+    commands.value.push(hydrate({ id: finalId, label, template }))
   }
 
   function update(id: string, label: string, template: string) {

@@ -8,6 +8,7 @@ import { markdownSetup, theme } from '@md/shared/editor'
 import imageCompression from 'browser-image-compression'
 import { Eye, Pen } from 'lucide-vue-next'
 import { SidebarAIToolbar } from '@/components/ai'
+import TitleBar from '@/components/editor/TitleBar.vue'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -678,6 +679,7 @@ onUnmounted(() => {
       @start-copy="startCopy"
       @end-copy="endCopy"
     />
+    <TitleBar />
     <EditorToolbar />
 
     <main class="container-main flex flex-1 flex-col">

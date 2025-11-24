@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, FileText, Globe, Link as LinkIcon, PlusCircle, WandSparkles, PenLine, ListTree } from 'lucide-vue-next'
+import { Check, FileText, Globe, Link as LinkIcon, ListTree, PenLine, PlusCircle, WandSparkles } from 'lucide-vue-next'
 import { AIPolishPopover } from '@/components/ai/tool-box'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'

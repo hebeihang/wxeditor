@@ -51,6 +51,7 @@ const addExamples = store.reactive<boolean>('ai_expand_add_examples', true)
 const expandCustomPrompt = store.reactive<string>('ai_expand_custom', '')
 
 const cmdMgrOpen = ref(false)
+const cmdMgrMode = ref<'all' | 'title'>('all')
 
 if (!titleStyle.value.startsWith('title-style:'))
   titleStyle.value = `title-style:${titleStyle.value}`
@@ -506,12 +507,16 @@ async function copy() {
                         </MenubarRadioGroup>
                       </MenubarSubContent>
                     </MenubarSub>
+                    <MenubarSeparator />
+                    <MenubarItem @click="cmdMgrMode = 'title'; cmdMgrOpen = true">
+                      管理标题提示词
+                    </MenubarItem>
                   </MenubarSubContent>
                 </MenubarSub>
               </MenubarSubContent>
             </MenubarSub>
             <MenubarSeparator />
-            <MenubarItem @click="cmdMgrOpen = true">
+            <MenubarItem @click="cmdMgrMode = 'all'; cmdMgrOpen = true">
               提示词管理
             </MenubarItem>
           </MenubarContent>
@@ -763,7 +768,7 @@ async function copy() {
   <FundDialog :visible="fundDialogVisible" @close="fundDialogVisible = false" />
   <EditorStateDialog :visible="editorStateDialogVisible" @close="editorStateDialogVisible = false" />
   <AIImageGeneratorPanel v-model:open="uiStore.aiImageDialogVisible" />
-  <QuickCommandManager v-model:open="cmdMgrOpen" />
+  <QuickCommandManager v-model:open="cmdMgrOpen" :mode="cmdMgrMode" />
 </template>
 
 <style lang="less" scoped>

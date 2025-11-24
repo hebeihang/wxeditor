@@ -1,0 +1,138 @@
+<script setup lang="ts">
+import { Sparkles } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import useAIConfigStore from '@/stores/aiConfig'
+import { useEditorStore } from '@/stores/editor'
+import { usePostStore } from '@/stores/post'
+import { useQuickCommands } from '@/stores/quickCommands'
+
+const aiStore = useAIConfigStore()
+const { endpoint, model, type, apiKey } = storeToRefs(aiStore)
+
+const editorStore = useEditorStore()
+const { editor } = storeToRefs(editorStore)
+
+const postStore = usePostStore()
+const { currentPost, currentPostId } = storeToRefs(postStore)
+
+const quickCmdStore = useQuickCommands()
+
+const loading = ref(false)
+const open = ref(false)
+const suggestions = ref<string[]>([])
+const titleInput = ref('')
+
+function stripLeadingEnum(text: string): string {
+  let s = text.trim()
+  const patterns = [
+    /^\s*(?:[（(]\s*)?\d+\s*[）)][.、:：\-\s]*/,
+    /^\s*\d+\s*[.、:：\-]\s*/,
+    /^\s*[A-Z]\s*[.)]\s*/i,
+  ]
+  for (let i = 0; i < 3; i++) {
+    const prev = s
+    for (const re of patterns)
+      s = s.replace(re, '')
+    if (s === prev)
+      break
+  }
+  return s.trim()
+}
+
+watch(currentPost, (p) => {
+  titleInput.value = p?.title ?? ''
+}, { immediate: true })
+
+function applyTitle(title: string) {
+  const cleaned = stripLeadingEnum(title)
+  postStore.renamePost(currentPostId.value, cleaned)
+  titleInput.value = cleaned
+}
+
+async function generateTitles() {
+  if (loading.value)
+    return
+  loading.value = true
+  try {
+    const tpl = quickCmdStore.commands.find(c => c.id === 'title-suggest')?.template || ''
+    const content = editor.value?.state.doc.toString() || ''
+    const prompt = tpl.replace(/\{\{\s*sel\s*\}\}/gi, content)
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (apiKey.value && type.value !== 'default')
+      headers.Authorization = `Bearer ${apiKey.value}`
+    const url = new URL(endpoint.value)
+    if (!url.pathname.endsWith('/chat/completions'))
+      url.pathname = url.pathname.replace(/\/?$/, '/chat/completions')
+    const payload = {
+      model: model.value,
+      messages: [
+        { role: 'system', content: '你是一个中文标题生成助手。' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 512,
+      stream: false,
+    }
+    const res = await fetch(url.toString(), { method: 'POST', headers, body: JSON.stringify(payload) })
+    const json = await res.json().catch(() => null)
+    const text: string = json?.choices?.[0]?.message?.content || ''
+    const list = text
+      .split(/\r?\n/)
+      .map(s => stripLeadingEnum(s))
+      .filter(s => !!s)
+      .slice(0, 20)
+    suggestions.value = list
+    open.value = true
+  }
+  catch {
+    suggestions.value = []
+    open.value = false
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+function onInput(e: Event) {
+  const val = (e.target as HTMLInputElement).value
+  titleInput.value = val
+  postStore.renamePost(currentPostId.value, val)
+}
+</script>
+
+<template>
+  <div class="titlebar-container border-b bg-background text-background-foreground">
+    <div class="mx-auto flex h-11 items-center gap-2 px-3 md:px-5">
+      <DropdownMenu v-model:open="open">
+        <DropdownMenuTrigger as-child>
+          <Button variant="ghost" size="sm" :disabled="loading" @click="generateTitles">
+            <Sparkles class="mr-2 size-4" />
+            AI 标题
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent class="max-h-64 w-80 overflow-y-auto">
+          <DropdownMenuItem v-if="loading" disabled>
+            生成中…
+          </DropdownMenuItem>
+          <DropdownMenuItem v-if="!loading && suggestions.length === 0" disabled>
+            暂无建议
+          </DropdownMenuItem>
+          <DropdownMenuItem v-for="s in suggestions" :key="s" class="whitespace-normal" @click="applyTitle(s)">
+            {{ s }}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Input :value="titleInput" placeholder="输入标题" class="flex-1" @input="onInput" />
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.titlebar-container {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+</style>
