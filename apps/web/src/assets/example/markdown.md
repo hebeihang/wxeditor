@@ -85,7 +85,7 @@ Markdown 中的段落就是一行接一行的文本。要创建新段落，只�
 - **代码块**：用三个反引号包裹，并指定语言，如：
 
 ```js
-console.log(`Hello, Doocs!`)
+console.log(`Hello, Doocs!`);
 ```
 
 语法高亮让你的代码更易读。

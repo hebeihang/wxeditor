@@ -516,9 +516,6 @@ async function copy() {
               </MenubarSubContent>
             </MenubarSub>
             <MenubarSeparator />
-            <MenubarItem @click="cmdMgrMode = 'all'; cmdMgrOpen = true">
-              提示词管理
-            </MenubarItem>
           </MenubarContent>
         </MenubarMenu>
         <HelpDropdown @open-about="handleOpenAbout" @open-fund="handleOpenFund" />
@@ -700,9 +697,6 @@ async function copy() {
                   </MenubarSubContent>
                 </MenubarSub>
                 <MenubarSeparator />
-                <MenubarItem @click="cmdMgrOpen = true">
-                  提示词管理
-                </MenubarItem>
               </MenubarSubContent>
             </MenubarSub>
             <HelpDropdown :as-sub="true" @open-about="handleOpenAbout" @open-fund="handleOpenFund" />

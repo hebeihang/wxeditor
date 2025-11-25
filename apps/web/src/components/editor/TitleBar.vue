@@ -41,12 +41,35 @@ function stripLeadingEnum(text: string): string {
   return s.trim()
 }
 
+function sanitizeTitleCandidate(text: string): string {
+  let s = text.trim()
+  s = s.replace(/^\s*[-*•·]\s+/, '')
+  s = s.replace(/^[（(【[]\s*(?:标题|建议|理由|说明|摘要|类别|分类|类型|风格|注释|注|解析|点评|总结|背景|导语|主体|结语|场景)\s*[）)】\]]\s*/, '')
+  s = s.replace(/^(?:标题|建议|理由|说明|摘要|类别|分类|类型|风格|注释|注|解析|点评|总结|背景|导语|主体|结语|场景)\s*[:：\-]\s*/, '')
+  s = s.replace(/\s+(?:[\-—–]|——)\s*(?:理由|说明|解析|点评|总结|背景|导语|主体|结语|分类|类别|类型|风格).*$/, '')
+  s = s.replace(/\s*[（(][^）)]*(?:理由|说明|解析|点评|总结|背景|导语|主体|结语|分类|类别|类型|风格)[^）)]*[）)]\s*$/, '')
+  s = s.replace(/^['"“”‘’]+|['"“”‘’]+$/g, '')
+  s = stripLeadingEnum(s)
+  return s.trim()
+}
+
+function isTitleCandidate(text: string): boolean {
+  const s = text.trim()
+  if (!s)
+    return false
+  if (/^(?:标题|建议|理由|说明|摘要|类别|分类|类型|风格|注释|注|解析|点评|总结|背景|导语|主体|结语|场景)(?:[:：\-]|$)/.test(s))
+    return false
+  if (s.length > 20)
+    return false
+  return true
+}
+
 watch(currentPost, (p) => {
   titleInput.value = p?.title ?? ''
 }, { immediate: true })
 
 function applyTitle(title: string) {
-  const cleaned = stripLeadingEnum(title)
+  const cleaned = sanitizeTitleCandidate(title)
   postStore.renamePost(currentPostId.value, cleaned)
   titleInput.value = cleaned
 }
@@ -78,11 +101,12 @@ async function generateTitles() {
     const res = await fetch(url.toString(), { method: 'POST', headers, body: JSON.stringify(payload) })
     const json = await res.json().catch(() => null)
     const text: string = json?.choices?.[0]?.message?.content || ''
-    const list = text
-      .split(/\r?\n/)
-      .map(s => stripLeadingEnum(s))
-      .filter(s => !!s)
-      .slice(0, 20)
+    const list = Array.from(new Set(
+      text
+        .split(/\r?\n/)
+        .map(s => sanitizeTitleCandidate(s))
+        .filter(s => isTitleCandidate(s)),
+    )).slice(0, 20)
     suggestions.value = list
     open.value = true
   }

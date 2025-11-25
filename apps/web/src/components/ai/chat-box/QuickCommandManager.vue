@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { Check } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useQuickCommands } from '@/stores/quickCommands'
+import { store as kvStore } from '@/utils/storage'
 
 /* ---------- 弹窗开关 ---------- */
 const props = defineProps<{ open: boolean, mode?: 'all' | 'title' }>()
@@ -15,8 +17,10 @@ watch(() => props.open, v => (dialogOpen.value = v))
 watch(dialogOpen, v => emit(`update:open`, v))
 
 /* ---------- store & 新增 ---------- */
-const store = useQuickCommands()
+const qcStore = useQuickCommands()
 const mode = computed(() => props.mode ?? 'all')
+const dialogTitle = computed(() => mode.value === 'title' ? '管理标题提示词' : '管理快捷指令')
+const currentTitleStyle = kvStore.reactive<string>('ai_title_style', 'title-style:mimon')
 const label = ref(``)
 const template = ref(``)
 
@@ -26,9 +30,9 @@ function addCmd() {
   const lbl = label.value.trim()
   const tpl = template.value.trim()
   if (mode.value === 'title')
-    store.add(lbl, tpl, `title-style:${crypto.randomUUID()}`)
+    qcStore.add(lbl, tpl, `title-style:${crypto.randomUUID()}`)
   else
-    store.add(lbl, tpl)
+    qcStore.add(lbl, tpl)
   label.value = ``
   template.value = ``
 }
@@ -49,7 +53,7 @@ function cancelEdit() {
 function saveEdit() {
   if (!editLabel.value.trim() || !editTemplate.value.trim())
     return
-  store.update(editingId.value!, editLabel.value.trim(), editTemplate.value.trim())
+  qcStore.update(editingId.value!, editLabel.value.trim(), editTemplate.value.trim())
   editingId.value = null
 }
 </script>
@@ -60,13 +64,13 @@ function saveEdit() {
       class="max-h-[90vh] w-[92vw] flex flex-col sm:max-w-lg"
     >
       <DialogHeader>
-        <DialogTitle>管理快捷指令</DialogTitle>
+        <DialogTitle>{{ dialogTitle }}</DialogTitle>
       </DialogHeader>
 
       <!-- 列表：独立滚动区域 -->
       <div class="space-y-4 flex-1 overflow-y-auto pr-1">
         <div
-          v-for="cmd in store.commands.filter(c => mode === 'title' ? c.id.startsWith('title-style:') || c.id === 'title-suggest' : true)"
+          v-for="cmd in qcStore.commands.filter(c => mode === 'title' ? c.id.startsWith('title-style:') : true)"
           :key="cmd.id"
           class="flex flex-col gap-2 border rounded-md p-3"
         >
@@ -91,12 +95,15 @@ function saveEdit() {
           <!-- 查看态 -->
           <template v-else>
             <div class="flex items-center justify-between">
-              <span class="break-all text-sm">{{ cmd.label }}</span>
+              <span class="break-all text-sm flex items-center gap-2">
+                <Check v-if="mode === 'title' && cmd.id === currentTitleStyle" class="h-4 w-4 text-green-600" />
+                {{ cmd.label }}
+              </span>
               <div class="flex gap-1">
                 <Button variant="ghost" size="xs" @click="beginEdit(cmd)">
                   编辑
                 </Button>
-                <Button variant="outline" size="xs" @click="store.remove(cmd.id)">
+                <Button variant="outline" size="xs" @click="qcStore.remove(cmd.id)">
                   删除
                 </Button>
               </div>

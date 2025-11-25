@@ -77,7 +77,22 @@ const replacementText = ref(``)
 const notesText = ref(``)
 const showNotes = ref(false)
 
-const actionValues = computed(() => actionOptions.map(o => o.value))
+const getActionTemplate = (id: string) => quickCmdStore.commands.find(c => c.id === id)?.template || ''
+const actionOptions = computed<ActionOption[]>(() => [
+  { value: `optimize`, label: `优化文本`, defaultPrompt: getActionTemplate(`action:optimize`) || `请优化文本，使其更通顺易读。` },
+  { value: `expand`, label: `补充 / 扩展`, defaultPrompt: getActionTemplate(`action:expand`) || `请根据上下文对文本进行扩展，增加细节与示例。` },
+  { value: `connect`, label: `衔接 / 连接（Connect）`, defaultPrompt: getActionTemplate(`action:connect`) || `使文本衔接更自然，补全隐含前提并说明。` },
+  { value: `translate`, label: `翻译（Translate）`, defaultPrompt: getActionTemplate(`action:translate-en`) || `将文本翻译为目标语言，保留术语并说明。` },
+  { value: `summarize`, label: `摘要 / 概括（Summarize）`, defaultPrompt: getActionTemplate(`action:summarize`) || `先一句话总括，再列出要点。` },
+  { value: `grammar`, label: `纠错 / 语法检查（Grammar / Proofread）`, defaultPrompt: getActionTemplate(`action:grammar`) || `检测并修正拼写、语法、标点与风格不一致。` },
+  { value: `continue`, label: `续写 / 补全（Continue）`, defaultPrompt: getActionTemplate(`action:continue`) || `从当前文本结尾继续写，保持语境连贯。` },
+  { value: `outline`, label: `结构 / 大纲（Outline）`, defaultPrompt: getActionTemplate(`action:outline`) || `生成层级化写作大纲，输出 Markdown 标题。` },
+  { value: `spellcheck`, label: `错别字纠正`, defaultPrompt: getActionTemplate(`action:grammar`) || `找出并纠正错别字、标点和语法错误。` },
+  { value: `translate-zh`, label: `翻译为中文`, defaultPrompt: getActionTemplate(`action:translate-zh`) || `请将文本翻译为地道的中文。` },
+  { value: `translate-en`, label: `翻译为英文`, defaultPrompt: getActionTemplate(`action:translate-en`) || `请将文本翻译为自然流畅的英文。` },
+  { value: `custom`, label: `自定义`, defaultPrompt: `` },
+])
+const actionValues = computed(() => actionOptions.value.map(o => o.value))
 
 const connectStyleId = ref<string>('')
 const connectToneId = ref<string>('none')
@@ -174,69 +189,7 @@ interface ActionOption {
   defaultPrompt: string
 }
 
-const actionOptions: ActionOption[] = [
-  {
-    value: `optimize`,
-    label: `优化文本`,
-    defaultPrompt: `请优化文本，使其更通顺易读。`,
-  },
-  {
-    value: `expand`,
-    label: `补充 / 扩展`,
-    defaultPrompt: `请根据上下文对文本进行扩展，增加细节与示例，必要处使用“示例：”标注。`,
-  },
-  {
-    value: `connect`,
-    label: `衔接 / 连接（Connect）`,
-    defaultPrompt: `使文本中断裂或不自然的转折变得平滑自然，支持句间、段间的逻辑衔接以及补全隐含前提。并用括号或注释说明修改原因。`,
-  },
-  {
-    value: `translate`,
-    label: `翻译（Translate）`,
-    defaultPrompt: `将文本翻译为目标语言，保留术语表映射，并遵循用语等级。文末附术语与决策说明。`,
-  },
-  {
-    value: `summarize`,
-    label: `摘要 / 概括（Summarize）`,
-    defaultPrompt: `将文本压缩为短版本，先给一句话总括，再可选列出要点。`,
-  },
-  {
-    value: `grammar`,
-    label: `纠错 / 语法检查（Grammar / Proofread）`,
-    defaultPrompt: `检测并修正拼写、语法、标点、重复词、风格不一致等问题。根据策略输出并注释问题位置。`,
-  },
-  {
-    value: `continue`,
-    label: `续写 / 补全（Continue）`,
-    defaultPrompt: `请从当前文本结尾继续写，保持语境连贯，输出 Markdown。`,
-  },
-  {
-    value: `outline`,
-    label: `结构 / 大纲（Outline）`,
-    defaultPrompt: `根据思路生成层级化写作大纲，输出 Markdown 标题。`,
-  },
-  {
-    value: `summarize`,
-    label: `文章总结`,
-    defaultPrompt: `请对文本进行摘要，输出主要观点和结论。`,
-  },
-  {
-    value: `spellcheck`,
-    label: `错别字纠正`,
-    defaultPrompt: `请找出并纠正文本中的错别字、标点和语法错误。`,
-  },
-  {
-    value: `translate-zh`,
-    label: `翻译为中文`,
-    defaultPrompt: `请将文本翻译为地道的中文。`,
-  },
-  {
-    value: `translate-en`,
-    label: `翻译为英文`,
-    defaultPrompt: `请将文本翻译为自然流畅的英文。`,
-  },
-  { value: `custom`, label: `自定义`, defaultPrompt: `` },
-]
+// actionOptions moved to computed above
 
 /* -------------------- watchers -------------------- */
 watch(message, async () => {
