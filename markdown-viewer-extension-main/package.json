@@ -1,0 +1,76 @@
+{
+  "name": "markdown-viewer-extension",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "A Chrome extension to view Markdown files with syntax highlighting",
+  "author": {
+    "name": "xicilion",
+    "url": "https://github.com/xicilion"
+  },
+  "license": "ISC",
+  "homepage": "https://github.com/xicilion/markdown-viewer-extension",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xicilion/markdown-viewer-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xicilion/markdown-viewer-extension/issues"
+  },
+  "keywords": [
+    "markdown",
+    "viewer",
+    "chrome-extension",
+    "syntax-highlighting",
+    "mermaid",
+    "katex",
+    "math-formulas",
+    "code-highlighting",
+    "markdown-to-png",
+    "svg-to-png",
+    "github-flavored-markdown",
+    "gfm",
+    "markdown-parser",
+    "unified",
+    "remark",
+    "rehype",
+    "office-integration",
+    "document-viewer",
+    "technical-documentation",
+    "chrome-manifest-v3"
+  ],
+  "main": "src/content.js",
+  "engines": {
+    "node": ">=16.0.0",
+    "fibjs": ">=0.36.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.js"
+  },
+  "dependencies": {
+    "buffer": "^6.0.3",
+    "d3-array": "^3.2.4",
+    "docx": "^9.0.2",
+    "esbuild": "^0.25.11",
+    "html2canvas": "^1.4.1",
+    "katex": "^0.16.25",
+    "mathjax-full": "^3.2.2",
+    "mathml2omml": "^0.5.0",
+    "mermaid": "^11.12.1",
+    "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
+    "rehype-slug": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.0.0",
+    "vega": "^6.2.0",
+    "vega-embed": "^7.1.0",
+    "vega-interpreter": "^2.2.1",
+    "vega-lite": "^6.4.1",
+    "xml-js": "^1.6.11"
+  }
+}

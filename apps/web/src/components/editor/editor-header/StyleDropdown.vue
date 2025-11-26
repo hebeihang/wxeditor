@@ -17,6 +17,7 @@ import { useEditorStore } from '@/stores/editor'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
+import { useWordStyleStore } from '@/stores/word-style'
 
 const props = withDefaults(defineProps<{
   asSub?: boolean
@@ -28,6 +29,7 @@ const { asSub } = toRefs(props)
 
 const themeStore = useThemeStore()
 const uiStore = useUIStore()
+const wordStyleStore = useWordStyleStore()
 const editorStore = useEditorStore()
 const renderStore = useRenderStore()
 
@@ -105,6 +107,11 @@ function macCodeBlockChanged() {
   editorRefresh()
 }
 
+function wordStyleChanged(id: 'default' | 'academic' | 'business' | 'minimal') {
+  wordStyleStore.setStyle(id)
+  toast.success(`已切换 Word 文档样式：${wordStyleStore.getCurrentPreset().name}`)
+}
+
 function resetStyleConfirm() {
   uiStore.isOpenConfirmDialog = true
 }
@@ -140,6 +147,18 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
       />
       <MenubarSeparator />
       <StyleOptionMenu
+        title="Word 文档样式"
+        :options="[
+          { label: '默认', value: 'default', desc: '正文 Calibri/12pt，完整边框' },
+          { label: '学术', value: 'academic', desc: 'Times/12pt，居中标题' },
+          { label: '商务', value: 'business', desc: 'Arial/11pt，紧凑布局' },
+          { label: '极简', value: 'minimal', desc: 'Segoe UI/11pt，去边框' },
+        ]"
+        :current="wordStyleStore.current"
+        :change="wordStyleChanged"
+      />
+      <MenubarSeparator />
+      <StyleOptionMenu
         title="字体"
         :options="fontFamilyOptions"
         :current="fontFamily"
@@ -168,6 +187,18 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         :options="legendOptions"
         :current="legend"
         :change="legendChanged"
+      />
+      <MenubarSeparator />
+      <StyleOptionMenu
+        title="Word 文档样式"
+        :options="[
+          { label: '默认', value: 'default', desc: '正文 Calibri/12pt，完整边框' },
+          { label: '学术', value: 'academic', desc: 'Times/12pt，居中标题' },
+          { label: '商务', value: 'business', desc: 'Arial/11pt，紧凑布局' },
+          { label: '极简', value: 'minimal', desc: 'Segoe UI/11pt，去边框' },
+        ]"
+        :current="wordStyleStore.current"
+        :change="wordStyleChanged"
       />
       <MenubarSeparator />
       <MenubarCheckboxItem @click.self.prevent="showPicker">

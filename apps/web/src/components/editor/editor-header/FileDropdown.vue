@@ -51,6 +51,10 @@ function downloadAsCardImage() {
 function exportEditorContent2PDF() {
   exportStore.exportEditorContent2PDF()
 }
+
+function exportEditorContent2DOCX() {
+  exportStore.exportEditorContent2DOCX()
+}
 </script>
 
 <template>
@@ -84,6 +88,11 @@ function exportEditorContent2PDF() {
           <MenubarItem @click="exportEditorContent2MD()">
             <FileText class="mr-2 size-4" />
             Markdown 文件
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem @click="exportEditorContent2DOCX()">
+            <FileText class="mr-2 size-4" />
+            Word 文档（.docx）
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem @click="exportEditorContent2HTML()">
@@ -160,6 +169,11 @@ function exportEditorContent2PDF() {
           <MenubarItem @click="exportEditorContent2MD()">
             <FileText class="mr-2 size-4" />
             Markdown 文件
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem @click="exportEditorContent2DOCX()">
+            <FileText class="mr-2 size-4" />
+            Word 文档（.docx）
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem @click="exportEditorContent2HTML()">

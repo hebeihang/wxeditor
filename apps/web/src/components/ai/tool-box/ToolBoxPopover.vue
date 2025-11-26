@@ -73,6 +73,7 @@ const quickCmdStore = useQuickCommands()
 const resultContainer = ref<HTMLElement | null>(null)
 const showDiff = ref(true)
 const diffHtml = ref(``)
+const originalDiffHtml = ref(``)
 const replacementText = ref(``)
 const notesText = ref(``)
 const showNotes = ref(false)
@@ -143,6 +144,14 @@ function deriveContinueContext(): string {
   }
 }
 
+function autoRunAIIfReady() {
+  if (!dialogVisible.value || loading.value)
+    return
+  const text = currentText.value?.trim()
+  if (text || selectedAction.value === 'continue')
+    runAIAction()
+}
+
 /* -------------------- dialog state sync -------------------- */
 watch(() => props.open, (val) => {
   dialogVisible.value = val
@@ -160,6 +169,7 @@ watch(() => props.open, (val) => {
     else {
       currentText.value = ''
     }
+    nextTick().then(() => autoRunAIIfReady())
   }
 })
 watch(dialogVisible, (val) => {
@@ -168,6 +178,7 @@ watch(dialogVisible, (val) => {
     // ensure a valid action is selected when dialog opens
     const preset = props.presetAction ?? selectedAction.value
     selectedAction.value = actionValues.value.includes(preset as string) ? (preset as any) : 'optimize'
+    nextTick().then(() => autoRunAIIfReady())
   }
 })
 
@@ -218,6 +229,7 @@ watch(
         currentText.value = ''
       }
       resetState()
+      nextTick().then(() => autoRunAIIfReady())
     }
   },
 )
@@ -226,28 +238,41 @@ watch(
 function extractReplacementAndNotes(raw: string): { replacement: string, notes: string } {
   let replacement = ''
   let notes = ''
+  const allNotes = raw.match(/<notes>[\s\S]*?<\/notes>/gi) || []
+  if (allNotes.length)
+    notes = allNotes.map(n => n.replace(/<\/?notes>/gi, '').trim()).join('\n\n')
+
   const rep = raw.match(/<replacement>[\s\S]*?<\/replacement>/i)
-  const not = raw.match(/<notes>[\s\S]*?<\/notes>/i)
-  if (rep)
-    replacement = rep[0].replace(/<\/?.*?>/g, '').trim()
-  if (not)
-    notes = not[0].replace(/<\/?.*?>/g, '').trim()
-  if (!replacement) {
-    const fence = raw.match(/```[\s\S]*?```/)
-    if (fence)
-      replacement = fence[0].replace(/```/g, '').trim()
+  if (rep) {
+    replacement = rep[0]
+      .replace(/<\/?replacement>/gi, '')
+      .replace(/<notes>[\s\S]*?<\/notes>/gi, '')
+      .trim()
+    replacement = replacement.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '').trim()
   }
   if (!replacement) {
-    const idx = raw.search(/\n#{1,6}\s|\n(?:术语与决策说明|说明|Notes)/i)
+    let stripped = raw.replace(/<notes>[\s\S]*?<\/notes>/gi, '').trim()
+    stripped = stripped.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '')
+    const idx = stripped.search(/\n#{1,6}\s|\n(?:术语与决策说明|说明|Notes)/i)
     if (idx > 0) {
-      replacement = raw.slice(0, idx).trim()
-      notes = raw.slice(idx).trim()
+      replacement = stripped.slice(0, idx).trim()
+      if (!notes)
+        notes = stripped.slice(idx).trim()
     }
+    if (!replacement) {
+      const fence = stripped.match(/```[\s\S]*?```/)
+      if (fence)
+        replacement = fence[0].replace(/```/g, '').trim()
+    }
+    if (!replacement)
+      replacement = stripped
   }
-  if (!replacement)
-    replacement = raw.trim()
-  if (!notes && rep && raw.length > replacement.length) {
-    notes = raw.replace(rep[0], '').trim()
+  const idx2 = replacement.search(/\n(?:#{1,6}\s*)?(?:术语与决策说明|说明|Notes?|Explanation|Reasoning)\s*[:：\n]/i)
+  if (idx2 > 0) {
+    const extra = replacement.slice(idx2).replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '').trim()
+    replacement = replacement.slice(0, idx2).trim()
+    if (extra)
+      notes = notes ? `${notes}\n\n${extra}` : extra
   }
   return { replacement, notes }
 }
@@ -270,6 +295,7 @@ function resetState() {
   hasResult.value = false
   error.value = ``
   diffHtml.value = ``
+  originalDiffHtml.value = ``
   replacementText.value = ``
   notesText.value = ``
   showNotes.value = false
@@ -355,6 +381,7 @@ async function runAIAction() {
             hasResult.value = true
             if (showDiff.value)
               diffHtml.value = buildDiffHtml(currentText.value, replacementText.value || message.value)
+            originalDiffHtml.value = buildOriginalDeletionsHtml(currentText.value, replacementText.value || message.value)
           }
         }
         catch {}
@@ -390,18 +417,18 @@ function buildActionPrompt(inputText: string): string {
   const extra = customPrompts.value.length ? `\n附加要求：${customPrompts.value.join('、')}。` : ''
   switch (selectedAction.value) {
     case 'optimize': {
-      const base = `请优化文本，使其更通顺易读。将用于替换原文的优化结果置于 <replacement>...</replacement>，将说明或理由置于 <notes>...</notes>。输出 Markdown。\n\n文本：\n${inputText}`
+      const base = `请优化文本，使其更通顺易读。将用于替换原文的优化结果置于 <replacement>...</replacement>，将说明或理由置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}`
       return `${base}${extra}`
     }
     case 'expand': {
-      const base = `请根据上下文对文本进行扩展，增加细节与示例，必要处使用“示例：”标注。将用于替换原文的扩展结果置于 <replacement>...</replacement>，将说明或扩展依据置于 <notes>...</notes>。输出 Markdown。\n\n文本：\n${inputText}`
+      const base = `请根据上下文对文本进行扩展，增加细节与示例，必要处使用“示例：”标注。将用于替换原文的扩展结果置于 <replacement>...</replacement>，将说明或扩展依据置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}`
       return `${base}${extra}`
     }
     case 'connect': {
       const style = getStyleLabel(connectStyleId.value)
       const tone = getToneLabel(connectToneId.value)
       const preserve = connectPreserveLength.value ? '尽量保持原文长度。' : ''
-      const base = `在下列范围（${connectScope.value}）内改写以改善衔接：\n\n${inputText}\n\n风格：${style}；情感：${tone}。${preserve}将用于替换原文的衔接后文本置于 <replacement>...</replacement>，将修改原因与逻辑说明置于 <notes>...</notes>。输出 Markdown。`
+      const base = `在下列范围（${connectScope.value}）内改写以改善衔接：\n\n${inputText}\n\n风格：${style}；情感：${tone}。${preserve}将用于替换原文的衔接后文本置于 <replacement>...</replacement>，将修改原因与逻辑说明置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。`
       const custom = connectCustomPrompt.value?.trim() ? `\n自定义指令：${connectCustomPrompt.value.trim()}` : ''
       return `${base}${custom}${extra}`
     }
@@ -416,7 +443,7 @@ function buildActionPrompt(inputText: string): string {
       catch {
         terminologySection = `术语表：{}。`
       }
-      const base = `将以下文本从 ${translateSourceLanguage.value} 翻译到 ${translateTargetLanguage.value}，${preserve}${terminologySection}遵循用语等级 ${translateFormalLevel.value}：\n\n${inputText}\n\n请在首行标注目标语言标签（${translateTargetLanguage.value}）。将译文置于 <replacement>...</replacement>，将“术语与决策说明”置于 <notes>...</notes>。输出 Markdown。`
+      const base = `将以下文本从 ${translateSourceLanguage.value} 翻译到 ${translateTargetLanguage.value}，${preserve}${terminologySection}遵循用语等级 ${translateFormalLevel.value}：\n\n${inputText}\n\n请在首行标注目标语言标签（${translateTargetLanguage.value}）。将译文置于 <replacement>...</replacement>，将“术语与决策说明”置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。`
       return `${base}${extra}`
     }
     case 'summarize': {
@@ -426,26 +453,26 @@ function buildActionPrompt(inputText: string): string {
       const modeText = mode === '百分比' ? `压缩为原文的 ${val}%` : `目标字数 ${val}`
       const keep = summarizePreserveKeyPoints.value ? '优先保留关键要点。' : ''
       const omit = summarizeExplainOmissions.value ? '列出被省略的重要信息。' : ''
-      const base = `将以下文本压缩（模式：${mode}，值：${val}），输出风格：${style}。${keep}${omit}先给出一句话总括，必要时再列出要点。将用于替换原文的文本置于 <replacement>...</replacement>，将解释或省略信息置于 <notes>...</notes>。输出 Markdown。\n\n文本：\n${inputText}\n\n提示：${modeText}。`
+      const base = `将以下文本压缩（模式：${mode}，值：${val}），输出风格：${style}。${keep}${omit}先给出一句话总括，必要时再列出要点。将用于替换原文的文本置于 <replacement>...</replacement>，将解释或省略信息置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}\n\n提示：${modeText}。`
       return `${base}${extra}`
     }
     case 'grammar': {
       const inline = grammarShowInlineAnnotations.value ? '注释用括号或行内注释形式展示。' : ''
       const guide = grammarStyleGuide.value?.trim() ? `风格指南：${grammarStyleGuide.value.trim()}。` : ''
-      const base = `检查以下文本的拼写、语法、标点与风格一致性（语言：${grammarLanguage.value}）。按 ${grammarAutoFix.value} 输出：给出建议、注释并提供修正后的版本。${inline}${guide}将可替换的修正后文本置于 <replacement>...</replacement>，所有解释与标注置于 <notes>...</notes>。输出 Markdown。\n\n文本：\n${inputText}`
+      const base = `检查以下文本的拼写、语法、标点与风格一致性（语言：${grammarLanguage.value}）。按 ${grammarAutoFix.value} 输出：给出建议、注释并提供修正后的版本。${inline}${guide}将可替换的修正后文本置于 <replacement>...</replacement>，所有解释与标注置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}`
       return `${base}${extra}`
     }
     case 'continue': {
       const style = getStyleLabel(continueStyleId.value)
       const tone = getToneLabel(continueToneId.value)
       const strict = snapToExistingContext.value ? '严格衔接现有上下文。' : ''
-      const base = `请从当前文本结尾继续写（模式：${continueMode.value}，目标：${wordsOrParagraphs.value}），风格：${style}，情感：${tone}。优先保持语境连贯。${strict}输出 Markdown。严格的排版要求：标题应独占一行，标题后需空一行再写正文；段落之间用空行分隔；不要把标题和正文写在同一行。\n\n文本：\n${inputText}`
+      const base = `请从当前文本结尾继续写（模式：${continueMode.value}，目标：${wordsOrParagraphs.value}），风格：${style}，情感：${tone}。优先保持语境连贯。${strict}输出 Markdown。严格的排版要求：标题应独占一行，标题后需空一行再写正文；段落之间用空行分隔；不要把标题和正文写在同一行。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}`
       return `${base}${extra}`
     }
     case 'outline': {
       const style = getStyleLabel(outlineStyleId.value)
       const sample = includeParagraphSamples.value ? '为每个要点生成简短示例段落。' : '无需示例段落。'
-      const base = `根据下面的思路生成一个深度为 ${outlineLevels.value} 的大纲（目标章节数：${outlineTargetSections.value}），风格：${style}。给出章节标题与每章 2-4 个要点，${sample}输出 Markdown（标题层级应使用 #）。\n\n思路：\n${inputText}`
+      const base = `根据下面的思路生成一个深度为 ${outlineLevels.value} 的大纲（目标章节数：${outlineTargetSections.value}），风格：${style}。给出章节标题与每章 2-4 个要点，${sample}输出 Markdown（标题层级应使用 #）。不要使用除 <replacement>/<notes> 外的任何标签。\n\n思路：\n${inputText}`
       return `${base}${extra}`
     }
     default: {
@@ -469,6 +496,8 @@ function replaceText() {
   const sel = editorView.state.selection.main
   let content = (replacementText.value || message.value)
   content = normalizeMarkdown(content)
+  if (selectedAction.value !== 'outline' && selectedAction.value !== 'summarize')
+    content = fixLeadingBullet(content)
   const to = sel.to
   const from = sel.from
 
@@ -481,6 +510,7 @@ function replaceText() {
 
   currentText.value = content
   resetState()
+  dialogVisible.value = false
 }
 
 function show() {
@@ -559,12 +589,62 @@ function buildDiffHtml(a: string, b: string): string {
 
 export { buildDiffHtml }
 
+function buildOriginalDeletionsHtml(a: string, b: string): string {
+  const A = tokenize(a)
+  const B = tokenize(b)
+  const m = A.length
+  const n = B.length
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array.from({ length: n + 1 }, () => 0))
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (A[i - 1] === B[j - 1])
+        dp[i][j] = dp[i - 1][j - 1] + 1
+      else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
+    }
+  }
+  const result: string[] = []
+  let i = m; let j = n
+  while (i > 0 && j > 0) {
+    if (A[i - 1] === B[j - 1]) {
+      result.unshift(escapeHtml(A[i - 1]))
+      i--; j--
+    }
+    else if (dp[i][j - 1] >= dp[i - 1][j]) {
+      j--
+    }
+    else {
+      const token = A[i - 1]
+      if (!/\s+/.test(token))
+        result.unshift(`<span class="line-through text-gray-500">${escapeHtml(token)}</span>`)
+      else
+        result.unshift(escapeHtml(token))
+      i--
+    }
+  }
+  while (i > 0) {
+    const token = A[i - 1]
+    if (!/\s+/.test(token))
+      result.unshift(`<span class="line-through text-gray-500">${escapeHtml(token)}</span>`)
+    else
+      result.unshift(escapeHtml(token))
+    i--
+  }
+  return result.join('')
+}
 function normalizeMarkdown(text: string): string {
   let s = text
   s = s.replace(/(^|\n)(\s{0,3}#{1,6}\s+[^\n]+)(?!\n)/g, `$1$2\n\n`)
   s = s.replace(/(^|\n)([-*+]\s+[^\n]+)(?!\n)/g, `$1$2\n`)
+  s = s.replace(/([^\n])\n([，。,．！？!?；;：:、…]+)/g, '$1$2')
   s = s.replace(/\n{3,}/g, `\n\n`)
   return s
+}
+
+function fixLeadingBullet(text: string): string {
+  const count = (text.match(/(^|\n)\s*[-*+]\s+/g) || []).length
+  if (count === 1)
+    return text.replace(/^\s*[-*+]\s+/, '')
+  return text
 }
 </script>
 
@@ -1051,9 +1131,12 @@ function normalizeMarkdown(text: string): string {
             原文
           </div>
           <div
-            class="border-border custom-scroll bg-muted/20 text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-line border rounded px-3 py-2 text-sm"
+            class="border-border custom-scroll bg-muted/20 text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap border rounded px-3 py-2 text-sm"
           >
-            {{ currentText }}
+            <div v-if="hasResult && showDiff" v-html="originalDiffHtml" />
+            <div v-else>
+              {{ currentText }}
+            </div>
           </div>
         </div>
 

@@ -1,13 +1,8 @@
 <script setup lang="ts">
-import { serviceOptions } from '@md/shared/configs'
-import { Bot, ChevronDownIcon, Cog, Image as ImageIcon, Menu, Palette, Plus, Sparkles, WandSparkles } from 'lucide-vue-next'
+import { Bot, ChevronDownIcon, Image as ImageIcon, Menu, Palette } from 'lucide-vue-next'
 import QuickCommandManager from '@/components/ai/chat-box/QuickCommandManager.vue'
-import { NumberField, NumberFieldContent, NumberFieldInput } from '@/components/ui/number-field'
-import { Textarea } from '@/components/ui/textarea'
-import useAIConfigStore from '@/stores/aiConfig'
 import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
-import { useQuickCommands } from '@/stores/quickCommands'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
@@ -33,43 +28,8 @@ const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
 const { isOpenRightSlider } = storeToRefs(uiStore)
-const AIConfigStore = useAIConfigStore()
-const { type } = storeToRefs(AIConfigStore)
-const quickCmdStore = useQuickCommands()
-const titleStyle = store.reactive<string>('ai_title_style', 'title-style:mimon')
-
-const styleId = store.reactive<string>('ai_style_id', 'style:business')
-const toneId = store.reactive<string>('ai_tone_id', '')
-const preserveNames = store.reactive<boolean>('ai_preserve_names', true)
-const polishLevel = store.reactive<string>('ai_polish_level', '中等')
-const polishCustomPrompt = store.reactive<string>('ai_polish_custom', '')
-
-const expandMode = store.reactive<string>('ai_expand_mode', '倍数扩写')
-const expandFactor = store.reactive<number>('ai_expand_factor', 2.0)
-const targetWords = store.reactive<number>('ai_expand_target_words', 300)
-const addExamples = store.reactive<boolean>('ai_expand_add_examples', true)
-const expandCustomPrompt = store.reactive<string>('ai_expand_custom', '')
-
 const cmdMgrOpen = ref(false)
-const cmdMgrMode = ref<'all' | 'title'>('all')
-
-if (!titleStyle.value.startsWith('title-style:'))
-  titleStyle.value = `title-style:${titleStyle.value}`
-
-function applyTitleStyle(styleId: string) {
-  titleStyle.value = styleId
-  const cmd = quickCmdStore.commands.find(c => c.id === styleId)
-  const tpl = cmd?.template || quickCmdStore.commands.find(c => c.id === 'title-suggest')?.template || ''
-  if (tpl)
-    quickCmdStore.update('title-suggest', '标题推荐', tpl)
-}
-
-if (quickCmdStore.commands.length)
-  applyTitleStyle(titleStyle.value)
-watch(() => quickCmdStore.commands.length, (len) => {
-  if (len)
-    applyTitleStyle(titleStyle.value)
-})
+const cmdMgrMode = ref<'all' | 'title' | 'optimize' | 'expand' | 'connect' | 'translate' | 'summarize' | 'grammar' | 'continue' | 'outline'>('all')
 
 // Editor refresh function
 function editorRefresh() {
@@ -85,68 +45,6 @@ function editorRefresh() {
     isMacCodeBlock: themeStore.isMacCodeBlock,
     isShowLineNumber: themeStore.isShowLineNumber,
   })
-}
-
-function getSelectedText(): string {
-  try {
-    const view: any = editor.value
-    if (!view)
-      return ''
-    const sel = view.state.selection.main
-    return view.state.doc.sliceString(sel.from, sel.to).trim()
-  }
-  catch {
-    return ''
-  }
-}
-
-function buildPolishPrompt(inputText: string): string {
-  const styleTpl = quickCmdStore.commands.find(c => c.id === styleId.value)?.template || ''
-  const toneTpl = toneId.value ? quickCmdStore.commands.find(c => c.id === toneId.value)?.template || '' : ''
-  const headerHint = '输出 Markdown，AI 自行决定是否使用标题/加粗/列表。'
-  const preserveHint = preserveNames.value ? '保留专有名词与人名地名。' : ''
-  const levelHint = `润色强度：${polishLevel.value}。`
-  const styleNote = styleTpl.replace(/\{\{\s*sel\s*\}\}/gi, inputText)
-  const toneNote = toneTpl ? `语气提示：${toneTpl}` : ''
-  const custom = polishCustomPrompt.value?.trim() ? polishCustomPrompt.value.trim() : ''
-  const prompt = `根据用户选择的风格（${styleId.value}）和情感（${toneId.value || '无'}），润色以下文本：\n\n${inputText}\n\n${levelHint}${preserveHint}${toneNote}\n${headerHint}\n${custom}\n\n${styleNote}`
-  return prompt
-}
-
-function buildExpandPrompt(inputText: string): string {
-  const styleTpl = quickCmdStore.commands.find(c => c.id === styleId.value)?.template || ''
-  const toneTpl = toneId.value ? quickCmdStore.commands.find(c => c.id === toneId.value)?.template || '' : ''
-  const mode = expandMode.value
-  const headerHint = '输出 Markdown。'
-  const exampleHint = addExamples.value ? '添加示例，并使用“示例：”标注。' : ''
-  const sizeHint = mode === '倍数扩写' ? `扩写倍数：${expandFactor.value}。` : mode === '目标字数' ? `目标字数：${targetWords.value}。` : '补充要点。'
-  const toneNote = toneTpl ? `语气提示：${toneTpl}` : ''
-  const custom = expandCustomPrompt.value?.trim() ? expandCustomPrompt.value.trim() : ''
-  const styleNote = styleTpl.replace(/\{\{\s*sel\s*\}\}/gi, inputText)
-  const prompt = `把以下文本按${mode}扩写：\n倍数：${expandFactor.value}；目标字数：${targetWords.value}。\n\n${inputText}\n\n风格：${styleId.value}；情感：${toneId.value || '无'}。${sizeHint}${exampleHint}${toneNote}\n${headerHint}\n${custom}\n\n${styleNote}`
-  return prompt
-}
-
-function runPolish() {
-  const selected = getSelectedText()
-  if (!selected) {
-    toast.error('请先选择要处理的文本')
-    return
-  }
-  const prompt = buildPolishPrompt(selected)
-  uiStore.setAIPrefillInput(prompt)
-  uiStore.toggleAIDialog(true)
-}
-
-function runExpand() {
-  const selected = getSelectedText()
-  if (!selected) {
-    toast.error('请先选择要处理的文本')
-    return
-  }
-  const prompt = buildExpandPrompt(selected)
-  uiStore.setAIPrefillInput(prompt)
-  uiStore.toggleAIDialog(true)
 }
 
 // 对话框状态
@@ -361,160 +259,35 @@ async function copy() {
               打开 AI 文生图
             </MenubarItem>
             <MenubarSeparator />
-            <MenubarSub>
-              <MenubarSubTrigger>
-                写作
-              </MenubarSubTrigger>
-              <MenubarSubContent class="w-72">
-                <MenubarLabel>文风（必选）</MenubarLabel>
-                <MenubarRadioGroup v-model="styleId">
-                  <MenubarRadioItem v-for="opt in quickCmdStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
-                    {{ opt.label }}
-                  </MenubarRadioItem>
-                </MenubarRadioGroup>
-                <MenubarSeparator />
-                <MenubarLabel>情感（可选）</MenubarLabel>
-                <MenubarRadioGroup v-model="toneId">
-                  <MenubarRadioItem value="">
-                    无
-                  </MenubarRadioItem>
-                  <MenubarRadioItem v-for="opt in quickCmdStore.commands.filter(c => c.id.startsWith('tone:'))" :key="opt.id" :value="opt.id">
-                    {{ opt.label }}
-                  </MenubarRadioItem>
-                </MenubarRadioGroup>
-                <MenubarSeparator />
-                <MenubarSub>
-                  <MenubarSubTrigger>
-                    <WandSparkles class="mr-2 h-4 w-4" />
-                    润色
-                  </MenubarSubTrigger>
-                  <MenubarSubContent class="w-72">
-                    <MenubarCheckboxItem :checked="preserveNames" @click="preserveNames = !preserveNames">
-                      保留专有名词
-                    </MenubarCheckboxItem>
-                    <MenubarSeparator />
-                    <MenubarLabel>润色强度</MenubarLabel>
-                    <MenubarRadioGroup v-model="polishLevel">
-                      <MenubarRadioItem value="轻微">
-                        轻微
-                      </MenubarRadioItem>
-                      <MenubarRadioItem value="中等">
-                        中等
-                      </MenubarRadioItem>
-                      <MenubarRadioItem value="大量">
-                        大量
-                      </MenubarRadioItem>
-                    </MenubarRadioGroup>
-                    <MenubarSeparator />
-                    <MenubarLabel>自定义提示词</MenubarLabel>
-                    <div class="px-2 py-1.5">
-                      <Textarea v-model="polishCustomPrompt" rows="2" placeholder="例如：使语言更口语化，保留技术术语。" />
-                    </div>
-                    <MenubarSeparator />
-                    <MenubarItem @click="runPolish">
-                      <Bot class="mr-2 h-4 w-4" />
-                      执行润色
-                    </MenubarItem>
-                  </MenubarSubContent>
-                </MenubarSub>
-                <MenubarSub>
-                  <MenubarSubTrigger>
-                    <Plus class="mr-2 h-4 w-4" />
-                    扩展
-                  </MenubarSubTrigger>
-                  <MenubarSubContent class="w-72">
-                    <MenubarLabel>扩写模式</MenubarLabel>
-                    <MenubarRadioGroup v-model="expandMode">
-                      <MenubarRadioItem value="倍数扩写">
-                        倍数扩写
-                      </MenubarRadioItem>
-                      <MenubarRadioItem value="目标字数">
-                        目标字数
-                      </MenubarRadioItem>
-                      <MenubarRadioItem value="补充要点">
-                        补充要点
-                      </MenubarRadioItem>
-                    </MenubarRadioGroup>
-                    <MenubarSeparator />
-                    <MenubarLabel>扩写倍数</MenubarLabel>
-                    <div class="px-2 py-1.5">
-                      <NumberField v-model="expandFactor" :min="1" :max="10" :step="0.5">
-                        <NumberFieldContent>
-                          <NumberFieldInput />
-                        </NumberFieldContent>
-                      </NumberField>
-                    </div>
-                    <MenubarLabel>目标字数</MenubarLabel>
-                    <div class="px-2 py-1.5">
-                      <NumberField v-model="targetWords" :min="50" :max="10000" :step="50">
-                        <NumberFieldContent>
-                          <NumberFieldInput />
-                        </NumberFieldContent>
-                      </NumberField>
-                    </div>
-                    <MenubarCheckboxItem :checked="addExamples" @click="addExamples = !addExamples">
-                      添加示例/案例
-                    </MenubarCheckboxItem>
-                    <MenubarSeparator />
-                    <MenubarLabel>自定义提示词</MenubarLabel>
-                    <div class="px-2 py-1.5">
-                      <Textarea v-model="expandCustomPrompt" rows="2" />
-                    </div>
-                    <MenubarSeparator />
-                    <MenubarItem @click="runExpand">
-                      <Bot class="mr-2 h-4 w-4" />
-                      执行扩展
-                    </MenubarItem>
-                  </MenubarSubContent>
-                </MenubarSub>
-              </MenubarSubContent>
-            </MenubarSub>
-            <MenubarSub>
-              <MenubarSubTrigger>
-                标题
-              </MenubarSubTrigger>
-              <MenubarSubContent>
-                <!-- 3级：风格切换 -->
-                <MenubarSub>
-                  <MenubarSubTrigger>
-                    <Sparkles class="mr-2 h-4 w-4" />
-                    风格切换
-                  </MenubarSubTrigger>
-                  <MenubarSubContent>
-                    <MenubarRadioGroup v-model="titleStyle" @update:model-value="applyTitleStyle">
-                      <MenubarRadioItem v-for="opt in quickCmdStore.commands.filter(c => c.id.startsWith('title-style:'))" :key="opt.id" :value="opt.id">
-                        {{ opt.label }}
-                      </MenubarRadioItem>
-                    </MenubarRadioGroup>
-                  </MenubarSubContent>
-                </MenubarSub>
-                <!-- 3级：设置（服务类型、提示词编辑） -->
-                <MenubarSub>
-                  <MenubarSubTrigger>
-                    <Cog class="mr-2 h-4 w-4" />
-                    设置
-                  </MenubarSubTrigger>
-                  <MenubarSubContent>
-                    <MenubarSub>
-                      <MenubarSubTrigger>
-                        服务类型
-                      </MenubarSubTrigger>
-                      <MenubarSubContent>
-                        <MenubarRadioGroup v-model="type">
-                          <MenubarRadioItem v-for="svc in serviceOptions" :key="svc.value" :value="svc.value">
-                            {{ svc.label }}
-                          </MenubarRadioItem>
-                        </MenubarRadioGroup>
-                      </MenubarSubContent>
-                    </MenubarSub>
-                    <MenubarSeparator />
-                    <MenubarItem @click="cmdMgrMode = 'title'; cmdMgrOpen = true">
-                      管理标题提示词
-                    </MenubarItem>
-                  </MenubarSubContent>
-                </MenubarSub>
-              </MenubarSubContent>
-            </MenubarSub>
+
+            <MenubarItem @click="cmdMgrMode = 'title'; cmdMgrOpen = true">
+              标题
+            </MenubarItem>
+            <MenubarItem @click="cmdMgrMode = 'optimize'; cmdMgrOpen = true">
+              润色
+            </MenubarItem>
+            <MenubarItem @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
+              扩展
+            </MenubarItem>
+            <MenubarItem @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
+              衔接
+            </MenubarItem>
+            <MenubarItem @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
+              翻译
+            </MenubarItem>
+            <MenubarItem @click="cmdMgrMode = 'summarize'; cmdMgrOpen = true">
+              摘要
+            </MenubarItem>
+            <MenubarItem @click="cmdMgrMode = 'grammar'; cmdMgrOpen = true">
+              纠错
+            </MenubarItem>
+            <MenubarItem @click="cmdMgrMode = 'continue'; cmdMgrOpen = true">
+              续写
+            </MenubarItem>
+            <MenubarItem @click="cmdMgrMode = 'outline'; cmdMgrOpen = true">
+              大纲
+            </MenubarItem>
+
             <MenubarSeparator />
           </MenubarContent>
         </MenubarMenu>
@@ -552,151 +325,37 @@ async function copy() {
                   打开 AI 文生图
                 </MenubarItem>
                 <MenubarSeparator />
+                <MenubarItem @click="cmdMgrMode = 'title'; cmdMgrOpen = true">
+                  标题
+                </MenubarItem>
+                <MenubarItem @click="cmdMgrMode = 'optimize'; cmdMgrOpen = true">
+                  润色
+                </MenubarItem>
+                <MenubarItem @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
+                  扩展
+                </MenubarItem>
                 <MenubarSub>
-                  <MenubarSubTrigger>
-                    写作
-                  </MenubarSubTrigger>
-                  <MenubarSubContent class="w-72">
-                    <MenubarLabel>文风（必选）</MenubarLabel>
-                    <MenubarRadioGroup v-model="styleId">
-                      <MenubarRadioItem v-for="opt in quickCmdStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
-                        {{ opt.label }}
-                      </MenubarRadioItem>
-                    </MenubarRadioGroup>
-                    <MenubarSeparator />
-                    <MenubarLabel>情感（可选）</MenubarLabel>
-                    <MenubarRadioGroup v-model="toneId">
-                      <MenubarRadioItem value="">
-                        无
-                      </MenubarRadioItem>
-                      <MenubarRadioItem v-for="opt in quickCmdStore.commands.filter(c => c.id.startsWith('tone:'))" :key="opt.id" :value="opt.id">
-                        {{ opt.label }}
-                      </MenubarRadioItem>
-                    </MenubarRadioGroup>
-                    <MenubarSeparator />
-                    <MenubarSub>
-                      <MenubarSubTrigger>
-                        润色
-                      </MenubarSubTrigger>
-                      <MenubarSubContent class="w-72">
-                        <MenubarCheckboxItem :checked="preserveNames" @click="preserveNames = !preserveNames">
-                          保留专有名词
-                        </MenubarCheckboxItem>
-                        <MenubarSeparator />
-                        <MenubarLabel>润色强度</MenubarLabel>
-                        <MenubarRadioGroup v-model="polishLevel">
-                          <MenubarRadioItem value="轻微">
-                            轻微
-                          </MenubarRadioItem>
-                          <MenubarRadioItem value="中等">
-                            中等
-                          </MenubarRadioItem>
-                          <MenubarRadioItem value="大量">
-                            大量
-                          </MenubarRadioItem>
-                        </MenubarRadioGroup>
-                        <MenubarSeparator />
-                        <MenubarLabel>自定义提示词</MenubarLabel>
-                        <div class="px-2 py-1.5">
-                          <Textarea v-model="polishCustomPrompt" rows="2" placeholder="例如：使语言更口语化，保留技术术语。" />
-                        </div>
-                        <MenubarSeparator />
-                        <MenubarItem @click="runPolish">
-                          <Bot class="mr-2 h-4 w-4" />
-                          执行润色
-                        </MenubarItem>
-                      </MenubarSubContent>
-                    </MenubarSub>
-                    <MenubarSub>
-                      <MenubarSubTrigger>
-                        扩展
-                      </MenubarSubTrigger>
-                      <MenubarSubContent class="w-72">
-                        <MenubarLabel>扩写模式</MenubarLabel>
-                        <MenubarRadioGroup v-model="expandMode">
-                          <MenubarRadioItem value="倍数扩写">
-                            倍数扩写
-                          </MenubarRadioItem>
-                          <MenubarRadioItem value="目标字数">
-                            目标字数
-                          </MenubarRadioItem>
-                          <MenubarRadioItem value="补充要点">
-                            补充要点
-                          </MenubarRadioItem>
-                        </MenubarRadioGroup>
-                        <MenubarSeparator />
-                        <MenubarLabel>扩写倍数</MenubarLabel>
-                        <div class="px-2 py-1.5">
-                          <NumberField v-model="expandFactor" :min="1" :max="10" :step="0.5">
-                            <NumberFieldContent>
-                              <NumberFieldInput />
-                            </NumberFieldContent>
-                          </NumberField>
-                        </div>
-                        <MenubarLabel>目标字数</MenubarLabel>
-                        <div class="px-2 py-1.5">
-                          <NumberField v-model="targetWords" :min="50" :max="10000" :step="50">
-                            <NumberFieldContent>
-                              <NumberFieldInput />
-                            </NumberFieldContent>
-                          </NumberField>
-                        </div>
-                        <MenubarCheckboxItem :checked="addExamples" @click="addExamples = !addExamples">
-                          添加示例/案例
-                        </MenubarCheckboxItem>
-                        <MenubarSeparator />
-                        <MenubarLabel>自定义提示词</MenubarLabel>
-                        <div class="px-2 py-1.5">
-                          <Textarea v-model="expandCustomPrompt" rows="2" />
-                        </div>
-                        <MenubarSeparator />
-                        <MenubarItem @click="runExpand">
-                          <Bot class="mr-2 h-4 w-4" />
-                          执行扩展
-                        </MenubarItem>
-                      </MenubarSubContent>
-                    </MenubarSub>
-                  </MenubarSubContent>
-                </MenubarSub>
-                <MenubarSub>
-                  <MenubarSubTrigger>
-                    标题
-                  </MenubarSubTrigger>
-                  <MenubarSubContent>
-                    <MenubarSub>
-                      <MenubarSubTrigger>
-                        风格切换
-                      </MenubarSubTrigger>
-                      <MenubarSubContent>
-                        <MenubarRadioGroup v-model="titleStyle" @update:model-value="applyTitleStyle">
-                          <MenubarRadioItem v-for="opt in quickCmdStore.commands.filter(c => c.id.startsWith('title-style:'))" :key="opt.id" :value="opt.id">
-                            {{ opt.label }}
-                          </MenubarRadioItem>
-                        </MenubarRadioGroup>
-                      </MenubarSubContent>
-                    </MenubarSub>
-                    <MenubarSub>
-                      <MenubarSubTrigger>
-                        设置
-                      </MenubarSubTrigger>
-                      <MenubarSubContent>
-                        <MenubarSub>
-                          <MenubarSubTrigger>
-                            服务类型
-                          </MenubarSubTrigger>
-                          <MenubarSubContent>
-                            <MenubarRadioGroup v-model="type">
-                              <MenubarRadioItem v-for="svc in serviceOptions" :key="svc.value" :value="svc.value">
-                                {{ svc.label }}
-                              </MenubarRadioItem>
-                            </MenubarRadioGroup>
-                          </MenubarSubContent>
-                        </MenubarSub>
-                      </MenubarSubContent>
-                    </MenubarSub>
-                  </MenubarSubContent>
-                </MenubarSub>
-                <MenubarSeparator />
+                  <MenubarItem @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
+                    衔接
+                  </MenubarItem>
+                  <MenubarItem @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
+                    翻译
+                  </MenubarItem>
+                  <MenubarItem @click="cmdMgrMode = 'summarize'; cmdMgrOpen = true">
+                    摘要
+                  </MenubarItem>
+                  <MenubarItem @click="cmdMgrMode = 'grammar'; cmdMgrOpen = true">
+                    纠错
+                  </MenubarItem>
+                  <MenubarItem @click="cmdMgrMode = 'continue'; cmdMgrOpen = true">
+                    续写
+                  </MenubarItem>
+                  <MenubarItem @click="cmdMgrMode = 'outline'; cmdMgrOpen = true">
+                    大纲
+                  </MenubarItem>
+
+                  <MenubarSeparator />
+                </menubarsub>
               </MenubarSubContent>
             </MenubarSub>
             <HelpDropdown :as-sub="true" @open-about="handleOpenAbout" @open-fund="handleOpenFund" />

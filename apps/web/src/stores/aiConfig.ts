@@ -85,6 +85,39 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
   })
 
   // ==================== Actions ====================
+  function getFeatureTypeRef(feature: string) {
+    return store.reactive<string>(`openai_feature_type_${feature}`, DEFAULT_SERVICE_TYPE)
+  }
+
+  function getFeatureModelRef(feature: string) {
+    return customRef<string>((track, trigger) => {
+      let cached = ``
+      store.get(`openai_feature_model_${feature}`).then((val) => {
+        cached = val || ``
+      })
+      return {
+        get() {
+          track()
+          return cached
+        },
+        set(val: string) {
+          cached = val
+          trigger()
+          store.set(`openai_feature_model_${feature}`, val)
+        },
+      }
+    })
+  }
+
+  async function useFeature(feature: string) {
+    const t = (await store.get(`openai_feature_type_${feature}`)) || DEFAULT_SERVICE_TYPE
+    const m = (await store.get(`openai_feature_model_${feature}`)) || ``
+    type.value = t
+    if (m) {
+      await store.set(`openai_model_${t}`, m)
+      model.value = m
+    }
+  }
 
   /**
    * 重置所有配置到默认值
@@ -103,18 +136,7 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
     )
   }
 
-  return {
-    // State
-    type,
-    endpoint,
-    model,
-    temperature,
-    maxToken,
-    apiKey,
-
-    // Actions
-    reset,
-  }
+  return { type, endpoint, model, temperature, maxToken, apiKey, reset, useFeature, getFeatureTypeRef, getFeatureModelRef }
 })
 
 // 默认导出（向后兼容）

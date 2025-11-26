@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, FileText, Globe, Link as LinkIcon, ListTree, PenLine, PlusCircle, WandSparkles } from 'lucide-vue-next'
+import { Check, FileText, Globe, Link as LinkIcon, ListTree, PenLine, PlusCircle, Wand2, WandSparkles } from 'lucide-vue-next'
 import { AIPolishPopover } from '@/components/ai/tool-box'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -87,6 +87,10 @@ function openOutline() {
       </Button>
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openGrammar">
         <Check class="mr-2 size-4" /> 纠错
+      </Button>
+
+      <Button variant="ghost" size="sm" :disabled="!editor" @click="uiStore.toggleAIImageDialog(true)">
+        <Wand2 class="mr-2 size-4" /> 文生图
       </Button>
 
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openContinue">

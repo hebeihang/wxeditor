@@ -1,0 +1,442 @@
+{
+  "async_processing_error": {
+    "message": "Lỗi {0}: {1}",
+    "description": "Generic error message with type and detail"
+  },
+  "async_processing_message": {
+    "message": "Đang xử lý {0}{1}...",
+    "description": "Async placeholder processing text"
+  },
+  "async_task_processing_error": {
+    "message": "Lỗi xử lý tác vụ: {0}",
+    "description": "Error when async task fails"
+  },
+  "async_unknown_error": {
+    "message": "Lỗi không xác định",
+    "description": "Fallback when error message missing"
+  },
+  "cache_clear": {
+    "message": "Xóa bộ nhớ đệm",
+    "description": "Clear cache button"
+  },
+  "cache_clear_confirm": {
+    "message": "Xóa tất cả dữ liệu bộ nhớ đệm? Hành động này không thể hoàn tác.",
+    "description": "Confirmation text for clearing cache"
+  },
+  "cache_clear_failed": {
+    "message": "Xóa bộ nhớ đệm thất bại",
+    "description": "Toast when cache clear fails"
+  },
+  "cache_clear_success": {
+    "message": "Đã xóa bộ nhớ đệm",
+    "description": "Toast when cache clear succeeds"
+  },
+  "cache_error_message": {
+    "message": "Giao tiếp bộ nhớ đệm thất bại — hãy mở tệp Markdown trước",
+    "description": "Shown when cache cannot be reached"
+  },
+  "cache_hint_details": {
+    "message": "Bộ nhớ đệm chạy tự động khi các trang Markdown đang mở",
+    "description": "Additional hint when cache is empty"
+  },
+  "cache_item_accessed_label": {
+    "message": "Truy cập lần cuối",
+    "description": "Label for cache item last access time"
+  },
+  "cache_item_created_label": {
+    "message": "Đã tạo",
+    "description": "Label for cache item created time"
+  },
+  "cache_item_size_label": {
+    "message": "Kích thước",
+    "description": "Label for cache item size"
+  },
+  "cache_item_type_label": {
+    "message": "Loại",
+    "description": "Label for cache item type"
+  },
+  "cache_item_type_unknown": {
+    "message": "không xác định",
+    "description": "Fallback label when cache type is missing"
+  },
+  "cache_items_empty": {
+    "message": "Chưa có mục nào được lưu",
+    "description": "Shown when the cache list is empty"
+  },
+  "cache_items_title": {
+    "message": "Mục đã lưu (20 mới nhất)",
+    "description": "Heading for cache items list"
+  },
+  "cache_loading_failed": {
+    "message": "Tải bộ nhớ đệm thất bại: {0}",
+    "description": "Displayed when cache loading throws an error"
+  },
+  "cache_manager_init_failed": {
+    "message": "Khởi tạo trình quản lý bộ nhớ đệm thất bại",
+    "description": "Error string used when cache manager cannot initialize"
+  },
+  "cache_manual_clear_intro": {
+    "message": "Để xóa bộ nhớ đệm thủ công:",
+    "description": "Manual cache clear intro"
+  },
+  "cache_manual_clear_step_1": {
+    "message": "Mở bất kỳ tệp Markdown nào",
+    "description": "Manual cache clear step"
+  },
+  "cache_manual_clear_step_2": {
+    "message": "Nhấn F12 để mở DevTools",
+    "description": "Manual cache clear step"
+  },
+  "cache_manual_clear_step_3": {
+    "message": "Chạy \"{0}\" trong console",
+    "description": "Manual cache clear step with code placeholder"
+  },
+  "cache_manual_clear_title": {
+    "message": "🧹 Xóa bộ nhớ đệm thủ công",
+    "description": "Manual cache clear title"
+  },
+  "cache_manual_limit_desc_1": {
+    "message": "Vì lý do bảo mật, popup không thể truy cập trực tiếp IndexedDB.",
+    "description": "Manual cache info description"
+  },
+  "cache_manual_limit_desc_2": {
+    "message": "Bộ nhớ đệm vẫn hoạt động khi hiển thị trang Markdown, nhưng popup không thể hiển thị chi tiết.",
+    "description": "Manual cache info description"
+  },
+  "cache_manual_limit_title": {
+    "message": "⚠️ Giới hạn truy cập bộ nhớ đệm",
+    "description": "Manual cache info section title"
+  },
+  "cache_manual_status_intro": {
+    "message": "Để đảm bảo bộ nhớ đệm hoạt động:",
+    "description": "Manual cache status intro"
+  },
+  "cache_manual_status_step_console": {
+    "message": "Kiểm tra log \"⚡ Using cached\" trong DevTools",
+    "description": "Manual cache status checklist"
+  },
+  "cache_manual_status_step_open": {
+    "message": "Mở một tệp Markdown",
+    "description": "Manual cache status checklist"
+  },
+  "cache_manual_status_step_speed": {
+    "message": "Nhận thấy hiển thị nhanh hơn khi bộ nhớ đệm đã khởi động",
+    "description": "Manual cache status checklist"
+  },
+  "cache_manual_status_title": {
+    "message": "📊 Kiểm tra trạng thái bộ nhớ đệm",
+    "description": "Manual cache status section title"
+  },
+  "cache_refresh": {
+    "message": "Làm mới",
+    "description": "Refresh cache button"
+  },
+  "cache_stat_capacity_label": {
+    "message": "Dung lượng tối đa",
+    "description": "Label for max cache entries"
+  },
+  "cache_stat_item_label": {
+    "message": "Mục đã lưu",
+    "description": "Label for number of cached items"
+  },
+  "cache_stat_size_label": {
+    "message": "Dung lượng đã dùng",
+    "description": "Label for cache size"
+  },
+  "cache_stat_usage_label": {
+    "message": "Dung lượng đã sử dụng",
+    "description": "Label for usage percentage"
+  },
+  "cache_system_unavailable": {
+    "message": "Hệ thống bộ nhớ đệm không khả dụng — hãy mở tệp Markdown trước",
+    "description": "Shown when cache manager cannot be reached"
+  },
+  "docx_export_failed_alert": {
+    "message": "Xuất thất bại{0}",
+    "description": "Alert shown when DOCX export fails"
+  },
+  "docx_export_failed_default": {
+    "message": "Xuất thất bại",
+    "description": "Fallback message when DOCX export fails"
+  },
+  "extensionDescription": {
+    "message": "Xem tệp Markdown với tô sáng cú pháp và công cụ xuất thông minh",
+    "description": "Extension description shown in Chrome Web Store"
+  },
+  "extensionName": {
+    "message": "Markdown Viewer",
+    "description": "Extension name"
+  },
+  "file_access_disabled": {
+    "message": "Đã tắt",
+    "description": "Status text when file access is disabled"
+  },
+  "file_access_disabled_desc_short": {
+    "message": "Để xem tệp cục bộ, hãy truy cập",
+    "description": "Short description prefix for file access warning"
+  },
+  "file_access_disabled_suffix": {
+    "message": "và bật 'Cho phép truy cập URL tệp'",
+    "description": "Suffix for file access warning"
+  },
+  "file_access_settings_link": {
+    "message": "trang cài đặt tiện ích",
+    "description": "Link text to extension settings"
+  },
+  "history_clear": {
+    "message": "Xóa lịch sử",
+    "description": "Clear history button"
+  },
+  "history_clear_confirm": {
+    "message": "Xóa tất cả lịch sử? Hành động này không thể hoàn tác.",
+    "description": "Clear history confirmation message"
+  },
+  "history_clear_failed": {
+    "message": "Xóa lịch sử thất bại",
+    "description": "Clear history failed message"
+  },
+  "history_clear_success": {
+    "message": "Đã xóa lịch sử",
+    "description": "Clear history success message"
+  },
+  "history_description": {
+    "message": "Hiển thị các tài liệu Markdown đã mở gần đây, nhấp để mở lại",
+    "description": "History documents description"
+  },
+  "history_items_empty": {
+    "message": "Chưa có lịch sử",
+    "description": "Empty history list message"
+  },
+  "history_loading_failed": {
+    "message": "Tải lịch sử thất bại",
+    "description": "Load history failed message"
+  },
+  "history_open_failed": {
+    "message": "Mở tài liệu thất bại",
+    "description": "Open history document failed message"
+  },
+  "history_refresh": {
+    "message": "Làm mới",
+    "description": "Refresh history button"
+  },
+  "history_title": {
+    "message": "Tài liệu gần đây",
+    "description": "History documents title"
+  },
+  "popup_title": {
+    "message": "Markdown Viewer",
+    "description": "Popup title"
+  },
+  "popup_version_label": {
+    "message": "Phiên bản {0}",
+    "description": "Shows the extension version in the header"
+  },
+  "settings_general_title": {
+    "message": "Cài đặt tiện ích mở rộng",
+    "description": "Tiêu đề phần cài đặt"
+  },
+  "settings_interface_title": {
+    "message": "Cài đặt giao diện",
+    "description": "Heading for interface settings section"
+  },
+  "settings_invalid_max_cache": {
+    "message": "Nhập kích thước bộ nhớ đệm hợp lệ từ {0} đến {1}",
+    "description": "Shown when max cache input is invalid"
+  },
+  "settings_language_auto": {
+    "message": "Khớp với ngôn ngữ Chrome",
+    "description": "Tùy chọn ngôn ngữ tự động"
+  },
+  "settings_language_changed": {
+    "message": "Đã thay đổi ngôn ngữ giao diện",
+    "description": "Toast when language is changed successfully"
+  },
+  "settings_language_da": {
+    "message": "Dansk",
+    "description": "Option for Danish locale"
+  },
+  "settings_language_de": {
+    "message": "Deutsch",
+    "description": "Option for German locale"
+  },
+  "settings_language_en": {
+    "message": "English",
+    "description": "Option for English locale"
+  },
+  "settings_language_es": {
+    "message": "Español",
+    "description": "Option for Spanish locale"
+  },
+  "settings_language_fi": {
+    "message": "Suomi",
+    "description": "Option for Finnish locale"
+  },
+  "settings_language_fr": {
+    "message": "Français",
+    "description": "Option for French locale"
+  },
+  "settings_language_hi": {
+    "message": "हिन्दी",
+    "description": "Option for Hindi locale"
+  },
+  "settings_language_id": {
+    "message": "Bahasa Indonesia",
+    "description": "Option for Indonesian locale"
+  },
+  "settings_language_it": {
+    "message": "Italiano",
+    "description": "Option for Italian locale"
+  },
+  "settings_language_ja": {
+    "message": "日本語",
+    "description": "Option for Japanese locale"
+  },
+  "settings_language_ko": {
+    "message": "한국어",
+    "description": "Option for Korean locale"
+  },
+  "settings_language_label": {
+    "message": "Ngôn ngữ giao diện:",
+    "description": "Label for language selector"
+  },
+  "settings_language_nl": {
+    "message": "Nederlands",
+    "description": "Option for Dutch locale"
+  },
+  "settings_language_no": {
+    "message": "Norsk",
+    "description": "Option for Norwegian locale"
+  },
+  "settings_language_note": {
+    "message": "Thay đổi này sẽ ghi đè ngôn ngữ giao diện Chrome cho tiện ích.",
+    "description": "Helper note for language selector"
+  },
+  "settings_language_pl": {
+    "message": "Polski",
+    "description": "Option for Polish locale"
+  },
+  "settings_language_pt_br": {
+    "message": "Português (Brasil)",
+    "description": "Option for Brazilian Portuguese locale"
+  },
+  "settings_language_pt_pt": {
+    "message": "Português (Portugal)",
+    "description": "Option for Portuguese locale"
+  },
+  "settings_language_ru": {
+    "message": "Русский",
+    "description": "Option for Russian locale"
+  },
+  "settings_language_sv": {
+    "message": "Svenska",
+    "description": "Option for Swedish locale"
+  },
+  "settings_language_th": {
+    "message": "ไทย",
+    "description": "Option for Thai locale"
+  },
+  "settings_language_tr": {
+    "message": "Türkçe",
+    "description": "Option for Turkish locale"
+  },
+  "settings_language_vi": {
+    "message": "Tiếng Việt",
+    "description": "Option for Vietnamese locale"
+  },
+  "settings_language_zh_cn": {
+    "message": "简体中文",
+    "description": "Tùy chọn cho tiếng Trung giản thể"
+  },
+  "settings_language_zh_tw": {
+    "message": "繁體中文",
+    "description": "Tùy chọn cho tiếng Trung phồn thể"
+  },
+  "settings_max_cache_label": {
+    "message": "Số mục tối đa trong bộ nhớ đệm:",
+    "description": "Label for max cache input"
+  },
+  "settings_reset_btn": {
+    "message": "Đặt lại về mặc định",
+    "description": "Reset button"
+  },
+  "settings_reset_confirm": {
+    "message": "Đặt lại tất cả cài đặt về giá trị mặc định?",
+    "description": "Confirmation text for resetting settings"
+  },
+  "settings_reset_failed": {
+    "message": "Đặt lại cài đặt thất bại",
+    "description": "Toast when resetting settings fails"
+  },
+  "settings_reset_success": {
+    "message": "Đã đặt lại cài đặt",
+    "description": "Toast when settings reset succeeds"
+  },
+  "settings_save_btn": {
+    "message": "Lưu cài đặt",
+    "description": "Save button"
+  },
+  "settings_save_failed": {
+    "message": "Lưu cài đặt thất bại",
+    "description": "Toast when saving settings fails"
+  },
+  "settings_save_success": {
+    "message": "Đã lưu cài đặt",
+    "description": "Toast when settings saved"
+  },
+  "settings_theme_changed": {
+    "message": "Đã thay đổi giao diện thành công. Vui lòng tải lại trang để xem thay đổi.",
+    "description": "Message shown when theme is changed"
+  },
+  "settings_theme_label": {
+    "message": "Chọn Giao diện:",
+    "description": "Label for theme selector"
+  },
+  "tab_cache": {
+    "message": "Bộ nhớ đệm",
+    "description": "Label for cache tab"
+  },
+  "tab_history": {
+    "message": "Lịch sử",
+    "description": "Label for history tab"
+  },
+  "tab_settings": {
+    "message": "Cài đặt",
+    "description": "Label for settings tab"
+  },
+  "toolbar_download_title": {
+    "message": "Tải xuống",
+    "description": "Toolbar download tooltip"
+  },
+  "toolbar_layout_title_fullscreen": {
+    "message": "Bố cục toàn màn hình",
+    "description": "Toolbar layout toggle tooltip for fullscreen mode"
+  },
+  "toolbar_layout_title_narrow": {
+    "message": "Bố cục hẹp",
+    "description": "Toolbar layout toggle tooltip for narrow mode"
+  },
+  "toolbar_layout_title_normal": {
+    "message": "Bố cục thông thường",
+    "description": "Toolbar layout toggle tooltip for normal mode"
+  },
+  "toolbar_print_disabled_title": {
+    "message": "Chỉ có thể in cho tệp cục bộ",
+    "description": "Tooltip when print button is disabled for remote files"
+  },
+  "toolbar_print_title": {
+    "message": "In",
+    "description": "Toolbar print tooltip"
+  },
+  "toolbar_toggle_toc_title": {
+    "message": "Hiện hoặc ẩn mục lục",
+    "description": "Toolbar button title for toggling TOC"
+  },
+  "toolbar_zoom_in_title": {
+    "message": "Phóng to",
+    "description": "Toolbar zoom in tooltip"
+  },
+  "toolbar_zoom_out_title": {
+    "message": "Thu nhỏ",
+    "description": "Toolbar zoom out tooltip"
+  }
+}

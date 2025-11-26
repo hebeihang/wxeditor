@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extensionName__",
+  "version": "1.1.2",
+  "default_locale": "en",
+  "description": "__MSG_extensionDescription__",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "offscreen",
+    "scripting",
+    "downloads"
+  ],
+  "host_permissions": ["file:///*", "https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "core/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "file://*/*.md",
+        "file://*/*.markdown",
+        "*://*/*.md",
+        "*://*/*.markdown"
+      ],
+      "js": ["core/content-detector.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "ui/styles.css",
+        "ui/offscreen.html",
+        "*.woff2",
+        "*.woff",
+        "*.ttf",
+        "_locales/*/messages.json",
+        "themes/font-config.json",
+        "themes/registry.json",
+        "themes/presets/*.json",
+        "themes/table-styles/*.json",
+        "themes/code-themes/*.json",
+        "themes/spacing-schemes/*.json"
+      ],
+      "matches": ["file://*", "https://*/*", "http://*/*"]
+    }
+  ],
+  "action": {
+    "default_popup": "ui/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
