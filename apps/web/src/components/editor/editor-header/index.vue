@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { Bot, ChevronDownIcon, Copy, Image as ImageIcon, Menu, Palette } from 'lucide-vue-next'
+import { Bot, ChevronDownIcon, Copy, Image as ImageIcon, Menu, Palette, Settings } from 'lucide-vue-next'
+import AIConfig from '@/components/ai/chat-box/AIConfig.vue'
 import QuickCommandManager from '@/components/ai/chat-box/QuickCommandManager.vue'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
+import { useQuickCommands } from '@/stores/quickCommands'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
@@ -30,6 +33,18 @@ const { primaryColor } = storeToRefs(themeStore)
 const { isOpenRightSlider } = storeToRefs(uiStore)
 const cmdMgrOpen = ref(false)
 const cmdMgrMode = ref<'all' | 'title' | 'optimize' | 'expand' | 'connect' | 'translate' | 'summarize' | 'grammar' | 'continue' | 'outline'>('all')
+
+const generalAIConfigVisible = ref(false)
+
+const quickCmdStore = useQuickCommands()
+const currentTitleStyle = store.reactive<string>('ai_title_style', 'title-style:news')
+function setCurrentTitleStyle(id: string) {
+  currentTitleStyle.value = id
+}
+const generalStyleId = store.reactive<string>('ai_general_style', 'general-style:consistent')
+function setCurrentGeneralStyle(id: string) {
+  generalStyleId.value = id
+}
 
 // Editor refresh function
 function editorRefresh() {
@@ -258,11 +273,47 @@ async function copy() {
               <ImageIcon class="mr-2 h-4 w-4" />
               打开 AI 文生图
             </MenubarItem>
+            <MenubarSub>
+              <MenubarSubTrigger>
+                <span class="inline-flex items-center">
+                  <Settings class="mr-2 h-4 w-4" />
+                  通用
+                </span>
+              </MenubarSubTrigger>
+              <MenubarSubContent class="max-h-56 overflow-auto">
+                <MenubarCheckboxItem
+                  v-for="cmd in quickCmdStore.commands.filter(c => c.id.startsWith('general-style:'))"
+                  :key="cmd.id"
+                  :checked="generalStyleId === cmd.id"
+                  @click="setCurrentGeneralStyle(cmd.id)"
+                >
+                  {{ cmd.label }}
+                </MenubarCheckboxItem>
+                <MenubarSeparator />
+                <MenubarItem @click="generalAIConfigVisible = true">
+                  管理通用前置提示词…
+                </MenubarItem>
+              </MenubarSubContent>
+            </MenubarSub>
             <MenubarSeparator />
 
-            <MenubarItem @click="cmdMgrMode = 'title'; cmdMgrOpen = true">
-              标题
-            </MenubarItem>
+            <MenubarSub>
+              <MenubarSubTrigger>标题</MenubarSubTrigger>
+              <MenubarSubContent class="max-h-56 overflow-auto">
+                <MenubarCheckboxItem
+                  v-for="cmd in quickCmdStore.commands.filter(c => c.id.startsWith('title-style:'))"
+                  :key="cmd.id"
+                  :checked="currentTitleStyle === cmd.id"
+                  @click="setCurrentTitleStyle(cmd.id)"
+                >
+                  {{ cmd.label }}
+                </MenubarCheckboxItem>
+                <MenubarSeparator />
+                <MenubarItem @click="cmdMgrMode = 'title'; cmdMgrOpen = true">
+                  管理标题风格…
+                </MenubarItem>
+              </MenubarSubContent>
+            </MenubarSub>
             <MenubarItem @click="cmdMgrMode = 'optimize'; cmdMgrOpen = true">
               润色
             </MenubarItem>
@@ -324,10 +375,48 @@ async function copy() {
                   <ImageIcon class="mr-2 h-4 w-4" />
                   打开 AI 文生图
                 </MenubarItem>
+                <MenubarSub>
+                  <MenubarSubTrigger>
+                    <span class="inline-flex items-center">
+                      <Settings class="mr-2 h-4 w-4" />
+                      通用
+                    </span>
+                  </MenubarSubTrigger>
+                  <MenubarSubContent class="max-h-56 overflow-auto">
+                    <MenubarCheckboxItem
+                      v-for="cmd in quickCmdStore.commands.filter(c => c.id.startsWith('general-style:'))"
+                      :key="cmd.id"
+                      :checked="generalStyleId === cmd.id"
+                      @click="setCurrentGeneralStyle(cmd.id)"
+                    >
+                      {{ cmd.label }}
+                    </MenubarCheckboxItem>
+                    <MenubarSeparator />
+                    <MenubarItem @click="generalAIConfigVisible = true">
+                      管理通用前置提示词…
+                    </MenubarItem>
+                  </MenubarSubContent>
+                </MenubarSub>
                 <MenubarSeparator />
-                <MenubarItem @click="cmdMgrMode = 'title'; cmdMgrOpen = true">
-                  标题
-                </MenubarItem>
+                <MenubarSub>
+                  <MenubarSubTrigger>
+                    标题
+                  </MenubarSubTrigger>
+                  <MenubarSubContent class="max-h-56 overflow-auto">
+                    <MenubarCheckboxItem
+                      v-for="cmd in quickCmdStore.commands.filter(c => c.id.startsWith('title-style:'))"
+                      :key="cmd.id"
+                      :checked="currentTitleStyle === cmd.id"
+                      @click="setCurrentTitleStyle(cmd.id)"
+                    >
+                      {{ cmd.label }}
+                    </MenubarCheckboxItem>
+                    <MenubarSeparator />
+                    <MenubarItem @click="cmdMgrMode = 'title'; cmdMgrOpen = true">
+                      管理标题风格…
+                    </MenubarItem>
+                  </MenubarSubContent>
+                </MenubarSub>
                 <MenubarItem @click="cmdMgrMode = 'optimize'; cmdMgrOpen = true">
                   润色
                 </MenubarItem>
@@ -423,6 +512,14 @@ async function copy() {
   <EditorStateDialog :visible="editorStateDialogVisible" @close="editorStateDialogVisible = false" />
   <AIImageGeneratorPanel v-model:open="uiStore.aiImageDialogVisible" />
   <QuickCommandManager v-model:open="cmdMgrOpen" :mode="cmdMgrMode" />
+  <Dialog v-model:open="generalAIConfigVisible">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>通用 AI 配置</DialogTitle>
+      </DialogHeader>
+      <AIConfig @saved="generalAIConfigVisible = false" />
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style lang="less" scoped>

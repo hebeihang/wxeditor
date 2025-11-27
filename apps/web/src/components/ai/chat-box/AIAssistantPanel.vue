@@ -81,6 +81,7 @@ const { apiKey, endpoint, model, temperature, maxToken, type } = storeToRefs(AIC
 
 const quickCmdStore = useQuickCommands()
 const { aiPrefillInput } = storeToRefs(uiStore)
+const generalStyleId = store.reactive<string>('ai_general_style', 'general-style:consistent')
 
 watch(aiPrefillInput, (val) => {
   if (val && typeof val === 'string') {
@@ -384,6 +385,10 @@ async function streamResponse(replyMessageProxy: ChatMessage) {
       role: `system`,
       content: `你是一个专业的 Markdown 编辑器助手，请用简洁中文回答。`,
     },
+    ...(function () {
+      const cmd = quickCmdStore.commands.find(c => c.id === generalStyleId.value)
+      return cmd?.template ? [{ role: `system`, content: cmd.template }] : []
+    })(),
     ...quoteMessages,
     ...contextHistory,
   ]

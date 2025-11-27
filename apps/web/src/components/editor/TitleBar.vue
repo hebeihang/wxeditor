@@ -19,6 +19,7 @@ const postStore = usePostStore()
 const { currentPost, currentPostId } = storeToRefs(postStore)
 
 const quickCmdStore = useQuickCommands()
+const generalStyleId = kvStore.reactive<string>('ai_general_style', 'general-style:consistent')
 
 const loading = ref(false)
 const open = ref(false)
@@ -100,6 +101,11 @@ async function generateTitles() {
       : baseTpl.replace(/\{\{\s*sel\s*\}\}/gi, content)
     const messages: Array<{ role: 'system' | 'user', content: string }> = []
     messages.push({ role: 'system', content: systemIntro })
+    {
+      const g = quickCmdStore.commands.find(c => c.id === generalStyleId.value)
+      if (g?.template)
+        messages.push({ role: 'system', content: g.template })
+    }
     if (strippedStyle)
       messages.push({ role: 'system', content: strippedStyle })
     messages.push({ role: 'user', content: prompt })

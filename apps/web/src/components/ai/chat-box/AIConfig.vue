@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { serviceOptions } from '@md/shared/configs'
 import { DEFAULT_SERVICE_TYPE } from '@md/shared/constants'
-import { Info } from 'lucide-vue-next'
+import { Check, Info } from 'lucide-vue-next'
 import { PasswordInput } from '@/components/ui/password-input'
+import { Textarea } from '@/components/ui/textarea'
 import useAIConfigStore from '@/stores/aiConfig'
+import { useQuickCommands } from '@/stores/quickCommands'
+import { store } from '@/utils/storage'
 
 /* -------------------------- 基础数据 -------------------------- */
 
@@ -11,6 +14,16 @@ const emit = defineEmits([`saved`])
 
 const AIConfigStore = useAIConfigStore()
 const { type, endpoint, model, apiKey, temperature, maxToken } = storeToRefs(AIConfigStore)
+
+const quickCmdStore = useQuickCommands()
+const generalStyleId = store.reactive<string>('ai_general_style', 'general-style:consistent')
+const generalStyles = computed(() => quickCmdStore.commands.filter(c => c.id.startsWith('general-style:')))
+const currentGeneral = computed(() => quickCmdStore.commands.find(c => c.id === generalStyleId.value) || null)
+const editingGeneralId = ref<string | null>(null)
+const editGeneralLabel = ref('')
+const editGeneralTemplate = ref('')
+const newGeneralLabel = ref('')
+const newGeneralTemplate = ref('')
 
 /** UI 状态 */
 const loading = ref(false)
@@ -102,6 +115,57 @@ async function testConnection() {
   finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  const id = 'general-style:consistent'
+  const existed = quickCmdStore.commands.find(c => c.id === id)
+  const newTpl = '在后续生成中，请尽量保持整体风格、情绪与格式与原文一致或相近，允许少量调整，不要出现明显偏差。'
+  if (!existed)
+    quickCmdStore.add('保持一致', newTpl, id)
+  else if (/严格遵守|段落字数保持一致|风格保持一致|情绪保持一致|格式保持一致/.test(existed.template))
+    quickCmdStore.update(id, existed.label, newTpl)
+  if (!generalStyles.value.find(c => c.id === generalStyleId.value))
+    generalStyleId.value = id
+})
+
+function beginEditGeneral(cmd: { id: string, label: string, template: string }) {
+  editingGeneralId.value = cmd.id
+  editGeneralLabel.value = cmd.label
+  editGeneralTemplate.value = cmd.template
+}
+function cancelEditGeneral() {
+  editingGeneralId.value = null
+}
+function saveEditGeneral() {
+  if (!editGeneralLabel.value.trim() || !editGeneralTemplate.value.trim())
+    return
+  quickCmdStore.update(editingGeneralId.value!, editGeneralLabel.value.trim(), editGeneralTemplate.value.trim())
+  editingGeneralId.value = null
+}
+function setCurrentGeneralStyle(id: string) {
+  generalStyleId.value = id
+}
+function addGeneral() {
+  if (!newGeneralLabel.value.trim() || !newGeneralTemplate.value.trim())
+    return
+  const label = newGeneralLabel.value.trim()
+  const template = newGeneralTemplate.value.trim()
+  const id = `general-style:${crypto.randomUUID()}`
+  quickCmdStore.add(label, template, id)
+  generalStyleId.value = id
+  newGeneralLabel.value = ''
+  newGeneralTemplate.value = ''
+}
+function removeGeneral(id?: string) {
+  const targetId = id || editingGeneralId.value || currentGeneral.value?.id
+  if (!targetId)
+    return
+  quickCmdStore.remove(targetId)
+  if (editingGeneralId.value === targetId)
+    editingGeneralId.value = null
+  const fallback = generalStyles.value[0]
+  generalStyleId.value = fallback ? fallback.id : 'general-style:consistent'
 }
 </script>
 
@@ -216,6 +280,62 @@ async function testConnection() {
         placeholder="比如 1024"
         class="focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
       />
+    </div>
+
+    <!-- 通用前置提示词（列表 + 编辑 + 新增，样式对齐标题提示词） -->
+    <div>
+      <Label class="mb-1 block text-sm font-medium">通用前置提示词</Label>
+
+      <div class="space-y-3">
+        <div
+          v-for="cmd in generalStyles"
+          :key="cmd.id"
+          class="flex flex-col gap-2 border rounded-md p-3"
+        >
+          <template v-if="editingGeneralId === cmd.id">
+            <Input v-model="editGeneralLabel" placeholder="提示词名称" />
+            <Textarea v-model="editGeneralTemplate" rows="3" placeholder="提示词内容" />
+            <div class="flex justify-end gap-2">
+              <Button size="xs" @click="saveEditGeneral">
+                保存
+              </Button>
+              <Button variant="ghost" size="xs" @click="cancelEditGeneral">
+                取消
+              </Button>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="flex items-center justify-between">
+              <span class="break-all text-sm flex items-center gap-2">
+                <Check v-if="cmd.id === generalStyleId" class="h-4 w-4 text-green-600" />
+                {{ cmd.label }}
+              </span>
+              <div class="flex gap-1">
+                <Button variant="secondary" size="xs" @click="setCurrentGeneralStyle(cmd.id)">
+                  设为当前
+                </Button>
+                <Button variant="ghost" size="xs" @click="beginEditGeneral(cmd)">
+                  编辑
+                </Button>
+                <Button variant="outline" size="xs" @click="removeGeneral(cmd.id)">
+                  删除
+                </Button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="space-y-2 border rounded-md p-3">
+          <Input v-model="newGeneralLabel" placeholder="提示词名称 (如：保持一致)" />
+          <Textarea v-model="newGeneralTemplate" rows="3" placeholder="提示词内容" />
+          <div class="flex justify-end">
+            <Button variant="secondary" size="xs" @click="addGeneral">
+              添加新提示词
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 操作按钮区域 -->

@@ -19,6 +19,7 @@ import {
 import useAIConfigStore from '@/stores/aiConfig'
 import { useEditorStore } from '@/stores/editor'
 import { useQuickCommands } from '@/stores/quickCommands'
+import { store as kvStore } from '@/utils/storage'
 
 /* -------------------- props / emits -------------------- */
 const props = defineProps<{
@@ -36,8 +37,6 @@ const props = defineProps<{
     | `outline`
     | `summarize`
     | `spellcheck`
-    | `translate-zh`
-    | `translate-en`
     | `custom`
 }>()
 const emit = defineEmits([`update:open`])
@@ -60,8 +59,6 @@ const selectedAction = ref<
   | `continue`
   | `outline`
   | `spellcheck`
-  | `translate-zh`
-  | `translate-en`
   | `custom`
 >(`optimize`)
 const currentText = ref(``)
@@ -80,17 +77,15 @@ const showNotes = ref(false)
 
 const getActionTemplate = (id: string) => quickCmdStore.commands.find(c => c.id === id)?.template || ''
 const actionOptions = computed<ActionOption[]>(() => [
-  { value: `optimize`, label: `优化文本`, defaultPrompt: getActionTemplate(`action:optimize`) || `请优化文本，使其更通顺易读。` },
-  { value: `expand`, label: `补充 / 扩展`, defaultPrompt: getActionTemplate(`action:expand`) || `请根据上下文对文本进行扩展，增加细节与示例。` },
-  { value: `connect`, label: `衔接 / 连接（Connect）`, defaultPrompt: getActionTemplate(`action:connect`) || `使文本衔接更自然，补全隐含前提并说明。` },
-  { value: `translate`, label: `翻译（Translate）`, defaultPrompt: getActionTemplate(`action:translate-en`) || `将文本翻译为目标语言，保留术语并说明。` },
-  { value: `summarize`, label: `摘要 / 概括（Summarize）`, defaultPrompt: getActionTemplate(`action:summarize`) || `先一句话总括，再列出要点。` },
-  { value: `grammar`, label: `纠错 / 语法检查（Grammar / Proofread）`, defaultPrompt: getActionTemplate(`action:grammar`) || `检测并修正拼写、语法、标点与风格不一致。` },
-  { value: `continue`, label: `续写 / 补全（Continue）`, defaultPrompt: getActionTemplate(`action:continue`) || `从当前文本结尾继续写，保持语境连贯。` },
-  { value: `outline`, label: `结构 / 大纲（Outline）`, defaultPrompt: getActionTemplate(`action:outline`) || `生成层级化写作大纲，输出 Markdown 标题。` },
+  { value: `optimize`, label: `润色`, defaultPrompt: getActionTemplate(`action:optimize`) || `请优化文本，使其更通顺易读。` },
+  { value: `expand`, label: `补充`, defaultPrompt: getActionTemplate(`action:expand`) || `请根据上下文对文本进行扩展，增加细节与示例。` },
+  { value: `connect`, label: `衔接`, defaultPrompt: getActionTemplate(`action:connect`) || `使文本衔接更自然，补全隐含前提并说明。` },
+  { value: `translate`, label: `翻译`, defaultPrompt: getActionTemplate(`action:translate-en`) || `将文本翻译为目标语言，保留术语并说明。` },
+  { value: `summarize`, label: `摘要`, defaultPrompt: getActionTemplate(`action:summarize`) || `先一句话总括，再列出要点。` },
+  { value: `grammar`, label: `纠错`, defaultPrompt: getActionTemplate(`action:grammar`) || `检测并修正拼写、语法、标点与风格不一致。` },
+  { value: `continue`, label: `续写`, defaultPrompt: getActionTemplate(`action:continue`) || `从当前文本结尾继续写，保持语境连贯。` },
+  { value: `outline`, label: `结构`, defaultPrompt: getActionTemplate(`action:outline`) || `生成层级化写作大纲，输出 Markdown 标题。` },
   { value: `spellcheck`, label: `错别字纠正`, defaultPrompt: getActionTemplate(`action:grammar`) || `找出并纠正错别字、标点和语法错误。` },
-  { value: `translate-zh`, label: `翻译为中文`, defaultPrompt: getActionTemplate(`action:translate-zh`) || `请将文本翻译为地道的中文。` },
-  { value: `translate-en`, label: `翻译为英文`, defaultPrompt: getActionTemplate(`action:translate-en`) || `请将文本翻译为自然流畅的英文。` },
   { value: `custom`, label: `自定义`, defaultPrompt: `` },
 ])
 const actionValues = computed(() => actionOptions.value.map(o => o.value))
@@ -102,10 +97,24 @@ const connectPreserveLength = ref(false)
 const connectCustomPrompt = ref('')
 
 const translateSourceLanguage = ref<'auto' | 'zh-CN' | 'en' | 'ja' | 'ko' | 'de' | 'fr' | 'it' | 'es' | 'pt'>('auto')
-const translateTargetLanguage = ref<'en' | 'ja' | 'ko' | 'de' | 'fr' | 'it' | 'es' | 'pt'>('en')
+const translateTargetLanguage = ref<'zh-CN' | 'en' | 'ja' | 'ko' | 'de' | 'fr' | 'it' | 'es' | 'pt'>('en')
 const translatePreserveNamedEntities = ref(true)
 const translateTerminology = ref<string>('{}')
 const translateFormalLevel = ref<'auto' | 'formal' | 'casual'>('auto')
+
+function normalizePresetAction(val?: string): string {
+  if (val === 'translate-zh') {
+    translateSourceLanguage.value = 'auto'
+    translateTargetLanguage.value = 'zh-CN'
+    return 'translate'
+  }
+  if (val === 'translate-en') {
+    translateSourceLanguage.value = 'auto'
+    translateTargetLanguage.value = 'en'
+    return 'translate'
+  }
+  return (val || 'optimize')
+}
 
 const summarizeStyleId = ref<string>('')
 const summarizeCompressionMode = ref<'百分比' | '目标字数'>('百分比')
@@ -158,7 +167,7 @@ watch(() => props.open, (val) => {
   if (val) {
     resetState()
     if (props.presetAction)
-      selectedAction.value = props.presetAction
+      selectedAction.value = normalizePresetAction(props.presetAction)
     const sel = props.selectedText.trim()
     if (sel) {
       currentText.value = sel
@@ -177,14 +186,16 @@ watch(dialogVisible, (val) => {
   if (val) {
     // ensure a valid action is selected when dialog opens
     const preset = props.presetAction ?? selectedAction.value
-    selectedAction.value = actionValues.value.includes(preset as string) ? (preset as any) : 'optimize'
+    const mapped = normalizePresetAction(preset as string)
+    selectedAction.value = actionValues.value.includes(mapped as string) ? (mapped as any) : 'optimize'
     nextTick().then(() => autoRunAIIfReady())
   }
 })
 
 watch(() => props.presetAction, (val) => {
   if (dialogVisible.value && val) {
-    selectedAction.value = actionValues.value.includes(val as string) ? (val as any) : 'optimize'
+    const mapped = normalizePresetAction(val as string)
+    selectedAction.value = actionValues.value.includes(mapped as string) ? (mapped as any) : 'optimize'
   }
 })
 
@@ -444,7 +455,41 @@ function buildActionPrompt(inputText: string): string {
   const extra = customPrompts.value.length ? `\n附加要求：${customPrompts.value.join('、')}。` : ''
   switch (selectedAction.value) {
     case 'optimize': {
-      const base = `请优化文本，使其更通顺易读。将用于替换原文的优化结果置于 <replacement>...</replacement>，将说明或理由置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}`
+      const polishStyleId = kvStore.reactive<string>('ai_style_id', 'style:business')
+      const polishToneId = kvStore.reactive<string>('ai_tone_id', '')
+      const preserveNames = kvStore.reactive<boolean>('ai_preserve_names', true)
+      const polishStrength = kvStore.reactive<number>('ai_polish_strength', 60)
+      const lengthPref = kvStore.reactive<string>('ai_polish_length_pref', '保持长度')
+      const structureOpt = kvStore.reactive<string>('ai_polish_structure_opt', 'none')
+      const readability = kvStore.reactive<string>('ai_polish_readability_level', '大众读者（高中）')
+      const custom = kvStore.reactive<string>('ai_polish_custom', '')
+
+      const style = getStyleLabel(polishStyleId.value)
+      const tone = getToneLabel(polishToneId.value || 'none')
+      const preserve = preserveNames.value ? '保留专有名词（人名、品牌、技术名词、机构名等）原样不改。' : ''
+      const strength = `润色强度：${polishStrength.value}/100（强度越高改动越大）。`
+      const lenText = lengthPref.value === '保持长度'
+        ? '整体长度尽量与原文一致。'
+        : lengthPref.value === '不超过原文'
+          ? '整体长度不超过原文，允许少量误差。'
+          : lengthPref.value === '稍微扩写（10-20%）'
+            ? '整体长度比原文扩写约 10-20%。'
+            : lengthPref.value === '适度扩写'
+              ? '整体长度比原文扩写约 20-40%。'
+              : '整体长度比原文扩写约 40-80%。'
+      const structText = structureOpt.value === 'none'
+        ? '不要调整段落结构或逻辑顺序。'
+        : structureOpt.value === 'mild'
+          ? '允许轻微结构优化（可补充过渡句、微调句序）。'
+          : '允许较强结构优化（可重排段落、增强逻辑）。'
+      const readText = readability.value === '专家读者'
+        ? '目标读者：专家读者。可使用专业术语与精炼表达，无需基础解释。'
+        : readability.value === '专业读者'
+          ? '目标读者：专业读者。允许适度术语与专业表达，保持清晰。'
+          : '目标读者：大众读者。术语解释充分，句式简洁，避免过多缩写。'
+      const customText = custom.value?.trim() ? `自定义指令优先：${custom.value.trim()}。` : ''
+
+      const base = `请根据以下设置对文本进行润色，严格遵守文风与语气，只输出润色后的 Markdown 文本，不要任何解释或附加说明。将结果置于 <replacement>...</replacement>，不要输出 <notes> 标签或其他标签。\n\n设置：\n- 文风：${style}\n- 语气：${tone}\n- ${strength}\n- ${lenText}\n- ${structText}\n- ${readText}\n- ${preserve}\n- ${customText}\n\n文本：\n${inputText}`
       return `${base}${extra}`
     }
     case 'expand': {
@@ -970,6 +1015,9 @@ function fixLeadingBullet(text: string): string {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
+                  <SelectItem value="zh-CN">
+                    zh-CN
+                  </SelectItem>
                   <SelectItem value="en">
                     en
                   </SelectItem>

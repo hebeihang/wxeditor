@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { serviceOptions } from '@md/shared/configs'
+import { Check } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import useAIConfigStore from '@/stores/aiConfig'
 import { useQuickCommands } from '@/stores/quickCommands'
@@ -61,9 +62,12 @@ function onSave() {
 
 /* ---------- 共享设置（与菜单一致的键名） ---------- */
 const styleId = kvStore.reactive<string>('ai_style_id', 'style:business')
-const toneId = kvStore.reactive<string>('ai_tone_id', '')
+const toneId = kvStore.reactive<string>('ai_tone_id', 'none')
 const preserveNames = kvStore.reactive<boolean>('ai_preserve_names', true)
-const polishLevel = kvStore.reactive<string>('ai_polish_level', '中等')
+const polishStrength = kvStore.reactive<number>('ai_polish_strength', 60)
+const polishLengthPreference = kvStore.reactive<string>('ai_polish_length_pref', '保持长度')
+const polishStructureOptimization = kvStore.reactive<string>('ai_polish_structure_opt', 'none')
+const polishReadabilityLevel = kvStore.reactive<string>('ai_polish_readability_level', '大众读者（高中）')
 const polishCustomPrompt = kvStore.reactive<string>('ai_polish_custom', '')
 
 const expandMode = kvStore.reactive<string>('ai_expand_mode', '倍数扩写')
@@ -134,7 +138,10 @@ watch([
   styleId,
   toneId,
   preserveNames,
-  polishLevel,
+  polishStrength,
+  polishLengthPreference,
+  polishStructureOptimization,
+  polishReadabilityLevel,
   polishCustomPrompt,
   expandMode,
   expandFactor,
@@ -175,7 +182,7 @@ watch([
 <template>
   <Dialog v-model:open="dialogOpen">
     <DialogContent
-      class="max-h-[90vh] w-[92vw] flex flex-col sm:max-w-lg"
+      class="max-h-[90vh] w-[92vw] flex flex-col sm:max-w-lg overflow-y-auto"
     >
       <DialogHeader>
         <DialogTitle>{{ dialogTitle }}</DialogTitle>
@@ -302,7 +309,7 @@ watch([
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="">
+              <SelectItem value="none">
                 无
               </SelectItem>
               <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('tone:'))" :key="opt.id" :value="opt.id">
@@ -317,20 +324,73 @@ watch([
           <Switch v-model:checked="preserveNames" />
         </div>
 
-        <Label class="mb-1">润色强度</Label>
-        <Select v-model="polishLevel">
+        <Label class="mb-1">润色强度（0-100）</Label>
+        <NumberField v-model="polishStrength" :min="0" :max="100" :step="5">
+          <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
+        </NumberField>
+
+        <Label class="mb-1">长度偏好</Label>
+        <Select v-model="polishLengthPreference">
           <SelectTrigger class="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="轻微">
-              轻微
+            <SelectItem value="保持长度">
+              保持长度
             </SelectItem>
-            <SelectItem value="中等">
-              中等
+            <SelectItem value="不超过原文">
+              不超过原文
             </SelectItem>
-            <SelectItem value="大量">
-              大量
+            <SelectItem value="稍微扩写（10-20%）">
+              稍微扩写（10-20%）
+            </SelectItem>
+            <SelectItem value="适度扩写">
+              适度扩写
+            </SelectItem>
+            <SelectItem value="显著扩写">
+              显著扩写
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Label class="mb-1">结构优化</Label>
+        <Select v-model="polishStructureOptimization">
+          <SelectTrigger class="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">
+              none
+            </SelectItem>
+            <SelectItem value="mild">
+              mild
+            </SelectItem>
+            <SelectItem value="strong">
+              strong
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Label class="mb-1">阅读难度</Label>
+        <Select v-model="polishReadabilityLevel">
+          <SelectTrigger class="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="大众读者（小学）">
+              大众读者（小学）
+            </SelectItem>
+            <SelectItem value="大众读者（初中）">
+              大众读者（初中）
+            </SelectItem>
+            <SelectItem value="大众读者（高中）">
+              大众读者（高中）
+            </SelectItem>
+            <SelectItem value="专业读者">
+              专业读者
+            </SelectItem>
+            <SelectItem value="专家读者">
+              专家读者
             </SelectItem>
           </SelectContent>
         </Select>
