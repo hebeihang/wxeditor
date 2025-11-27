@@ -373,22 +373,16 @@ async function streamResponse(replyMessageProxy: ChatMessage) {
     contextHistory = allHistory.slice(-10)
   }
   const quoteMessages: ChatMessage[] = isQuoteAllContent.value
-    ? [{
-        role: `system`,
-        content:
-          `下面是一篇 Markdown 文章全文，请严格以此为主完成后续指令：\n\n${editor.value?.state.doc.toString()}`,
-      }]
+    ? [{ role: 'system', content: `下面是一篇 Markdown 文章全文，请严格以此为主完成后续指令：\n\n${editor.value?.state.doc.toString()}` }]
     : []
 
+  const styleMessages: ChatMessage[] = (function () {
+    const cmd = quickCmdStore.commands.find(c => c.id === generalStyleId.value)
+    return cmd?.template ? [{ role: 'system', content: cmd.template }] : []
+  })()
   const payloadMessages: ChatMessage[] = [
-    {
-      role: `system`,
-      content: `你是一个专业的 Markdown 编辑器助手，请用简洁中文回答。`,
-    },
-    ...(function () {
-      const cmd = quickCmdStore.commands.find(c => c.id === generalStyleId.value)
-      return cmd?.template ? [{ role: `system`, content: cmd.template }] : []
-    })(),
+    { role: 'system', content: `你是一个专业的 Markdown 编辑器助手，请用简洁中文回答。` },
+    ...styleMessages,
     ...quoteMessages,
     ...contextHistory,
   ]

@@ -92,7 +92,7 @@ const translatePreserveNamedEntities = ref(true)
 const translateTerminology = ref<string>('{}')
 const translateFormalLevel = ref<'auto' | 'formal' | 'casual'>('auto')
 
-function normalizePresetAction(val?: ToolVariant): ToolVariant {
+function normalizePresetAction(val?: string): ToolVariant {
   if (val === 'translate-zh') {
     translateSourceLanguage.value = 'auto'
     translateTargetLanguage.value = 'zh-CN'
