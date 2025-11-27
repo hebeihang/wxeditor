@@ -103,7 +103,9 @@ function normalizePresetAction(val?: string): ToolVariant {
     translateTargetLanguage.value = 'en'
     return 'translate'
   }
-  return (val || 'optimize')
+  if (val && actionValues.value.includes(val as ToolVariant))
+    return val as ToolVariant
+  return 'optimize'
 }
 
 const summarizeStyleId = ref<string>('')
