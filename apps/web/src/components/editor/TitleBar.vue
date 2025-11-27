@@ -99,7 +99,7 @@ async function generateTitles() {
     const prompt = styleTpl
       ? `请基于以下正文生成10个中文标题（≤20字，换行分隔）。\n\n${content}`
       : baseTpl.replace(/\{\{\s*sel\s*\}\}/gi, content)
-    const messages: Array<{ role: 'system' | 'user', content: string }> = []
+    const messages: Array<{ role: 'system' | 'user' | 'assistant', content: string }> = []
     messages.push({ role: 'system', content: systemIntro })
     {
       const g = quickCmdStore.commands.find(c => c.id === generalStyleId.value)

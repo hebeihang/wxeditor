@@ -22,22 +22,23 @@ import { useQuickCommands } from '@/stores/quickCommands'
 import { store as kvStore } from '@/utils/storage'
 
 /* -------------------- props / emits -------------------- */
+type ToolVariant
+  = | 'expand'
+    | 'custom'
+    | 'outline'
+    | 'optimize'
+    | 'connect'
+    | 'translate'
+    | 'summarize'
+    | 'grammar'
+    | 'continue'
+    | 'spellcheck'
+
 const props = defineProps<{
   open: boolean
   selectedText: string
   isMobile: boolean
-  presetAction?:
-    | `optimize`
-    | `expand`
-    | `connect`
-    | `translate`
-    | `summarize`
-    | `grammar`
-    | `continue`
-    | `outline`
-    | `summarize`
-    | `spellcheck`
-    | `custom`
+  presetAction?: ToolVariant
 }>()
 const emit = defineEmits([`update:open`])
 
@@ -49,18 +50,7 @@ const loading = ref(false)
 const abortController = ref<AbortController | null>(null)
 const customPrompts = ref<string[]>([])
 const hasResult = ref(false)
-const selectedAction = ref<
-  `optimize`
-  | `expand`
-  | `connect`
-  | `translate`
-  | `summarize`
-  | `grammar`
-  | `continue`
-  | `outline`
-  | `spellcheck`
-  | `custom`
->(`optimize`)
+const selectedAction = ref<ToolVariant>('optimize')
 const currentText = ref(``)
 const error = ref(``)
 
@@ -88,7 +78,7 @@ const actionOptions = computed<ActionOption[]>(() => [
   { value: `spellcheck`, label: `错别字纠正`, defaultPrompt: getActionTemplate(`action:grammar`) || `找出并纠正错别字、标点和语法错误。` },
   { value: `custom`, label: `自定义`, defaultPrompt: `` },
 ])
-const actionValues = computed(() => actionOptions.value.map(o => o.value))
+const actionValues = computed<ToolVariant[]>(() => actionOptions.value.map(o => o.value as ToolVariant))
 
 const connectStyleId = ref<string>('')
 const connectToneId = ref<string>('none')
@@ -102,7 +92,7 @@ const translatePreserveNamedEntities = ref(true)
 const translateTerminology = ref<string>('{}')
 const translateFormalLevel = ref<'auto' | 'formal' | 'casual'>('auto')
 
-function normalizePresetAction(val?: string): string {
+function normalizePresetAction(val?: ToolVariant): ToolVariant {
   if (val === 'translate-zh') {
     translateSourceLanguage.value = 'auto'
     translateTargetLanguage.value = 'zh-CN'
@@ -185,17 +175,17 @@ watch(dialogVisible, (val) => {
   emit(`update:open`, val)
   if (val) {
     // ensure a valid action is selected when dialog opens
-    const preset = props.presetAction ?? selectedAction.value
-    const mapped = normalizePresetAction(preset as string)
-    selectedAction.value = actionValues.value.includes(mapped as string) ? (mapped as any) : 'optimize'
+    const preset = (props.presetAction ?? selectedAction.value) as ToolVariant
+    const mapped = normalizePresetAction(preset)
+    selectedAction.value = actionValues.value.includes(mapped) ? mapped : 'optimize'
     nextTick().then(() => autoRunAIIfReady())
   }
 })
 
 watch(() => props.presetAction, (val) => {
   if (dialogVisible.value && val) {
-    const mapped = normalizePresetAction(val as string)
-    selectedAction.value = actionValues.value.includes(mapped as string) ? (mapped as any) : 'optimize'
+    const mapped = normalizePresetAction(val)
+    selectedAction.value = actionValues.value.includes(mapped) ? mapped : 'optimize'
   }
 })
 
@@ -206,7 +196,7 @@ const { apiKey, endpoint, model, temperature, maxToken, type }
 
 /* -------------------- action options -------------------- */
 interface ActionOption {
-  value: string
+  value: ToolVariant
   label: string
   defaultPrompt: string
 }
@@ -355,7 +345,7 @@ async function runAIAction() {
 
   const systemPrompt
     = `你是一名专业的多语言文本助手，请根据用户的指令处理下列内容。在输出时，不要输出任何额外的信息，只输出处理后的文本。`
-  const messages = [
+  const messages: Array<{ role: 'system' | 'user' | 'assistant', content: string }> = [
     { role: `system`, content: systemPrompt },
     { role: `user`, content: buildActionPrompt(text) },
   ]

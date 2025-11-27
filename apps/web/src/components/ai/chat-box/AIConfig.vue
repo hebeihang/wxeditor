@@ -75,7 +75,7 @@ async function testConnection() {
 
     const payload = {
       model: model.value,
-      messages: [{ role: `user`, content: `ping` }],
+      messages: ([{ role: `user`, content: `ping` }] as Array<{ role: 'system' | 'user' | 'assistant', content: string }>),
       temperature: 0,
       max_tokens: 1,
       stream: false,
