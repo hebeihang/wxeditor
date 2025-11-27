@@ -239,19 +239,36 @@ function extractReplacementAndNotes(raw: string): { replacement: string, notes: 
   let replacement = ''
   let notes = ''
   const allNotes = raw.match(/<notes>[\s\S]*?<\/notes>/gi) || []
-  if (allNotes.length)
+  if (allNotes.length) {
     notes = allNotes.map(n => n.replace(/<\/?notes>/gi, '').trim()).join('\n\n')
+  }
+  else {
+    const incompleteNotes = raw.match(/<notes>[\s\S]*$/i)
+    if (incompleteNotes)
+      notes = incompleteNotes[0].replace(/<\/?notes>/gi, '').trim()
+  }
 
-  const rep = raw.match(/<replacement>[\s\S]*?<\/replacement>/i)
+  const rep = raw.match(/<replacement>[\s\S]*?<\/replacement>/i) || raw.match(/<replacement>[\s\S]*?(?=<notes>|$)/i)
   if (rep) {
-    replacement = rep[0]
+    let candidateRep = rep[0]
       .replace(/<\/?replacement>/gi, '')
       .replace(/<notes>[\s\S]*?<\/notes>/gi, '')
+      .replace(/<notes>[\s\S]*$/i, '')
       .trim()
-    replacement = replacement.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '').trim()
+    candidateRep = candidateRep.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '').trim()
+    let candidateLeading = raw
+      .replace(/<notes>[\s\S]*?<\/notes>/gi, '')
+      .replace(/<notes>[\s\S]*$/i, '')
+      .split(/<replacement>/i)[0]
+    candidateLeading = candidateLeading.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '').trim()
+    replacement = (candidateLeading.length > candidateRep.length ? candidateLeading : candidateRep)
   }
   if (!replacement) {
-    let stripped = raw.replace(/<notes>[\s\S]*?<\/notes>/gi, '').trim()
+    let stripped = raw
+      .replace(/<notes>[\s\S]*?<\/notes>/gi, '')
+      .replace(/<notes>[\s\S]*$/i, '')
+      .replace(/<\/?replacement>/gi, '')
+      .trim()
     stripped = stripped.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '')
     const idx = stripped.search(/\n#{1,6}\s|\n(?:术语与决策说明|说明|Notes)/i)
     if (idx > 0) {
@@ -275,6 +292,15 @@ function extractReplacementAndNotes(raw: string): { replacement: string, notes: 
       notes = notes ? `${notes}\n\n${extra}` : extra
   }
   return { replacement, notes }
+}
+
+function sanitizeAIContent(raw: string): string {
+  let s = raw || ''
+  s = s.replace(/<notes>[\s\S]*?<\/notes>/gi, '')
+  s = s.replace(/<notes>[\s\S]*$/i, '')
+  s = s.replace(/<\/?replacement>/gi, '')
+  s = s.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '')
+  return s.trim()
 }
 function addPrompt(e: KeyboardEvent) {
   const input = e.target as HTMLInputElement
@@ -379,9 +405,10 @@ async function runAIAction() {
             replacementText.value = parsed.replacement
             notesText.value = parsed.notes
             hasResult.value = true
+            const usedContent = sanitizeAIContent(replacementText.value || message.value)
             if (showDiff.value)
-              diffHtml.value = buildDiffHtml(currentText.value, replacementText.value || message.value)
-            originalDiffHtml.value = buildOriginalDeletionsHtml(currentText.value, replacementText.value || message.value)
+              diffHtml.value = buildDiffHtml(currentText.value, usedContent)
+            originalDiffHtml.value = buildOriginalDeletionsHtml(currentText.value, usedContent)
           }
         }
         catch {}
@@ -494,7 +521,7 @@ function stopAI() {
 function replaceText() {
   const editorView = toRaw(editorStore.editor!)!
   const sel = editorView.state.selection.main
-  let content = (replacementText.value || message.value)
+  let content = sanitizeAIContent(replacementText.value || message.value)
   content = normalizeMarkdown(content)
   if (selectedAction.value !== 'outline' && selectedAction.value !== 'summarize')
     content = fixLeadingBullet(content)

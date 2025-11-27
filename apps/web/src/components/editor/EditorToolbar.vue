@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, FileText, Globe, Link as LinkIcon, ListTree, PenLine, PlusCircle, Wand2, WandSparkles } from 'lucide-vue-next'
+import { Check, FileText, Globe, Link as LinkIcon, ListTree, PenLine, PlusCircle, WandSparkles } from 'lucide-vue-next'
 import { AIPolishPopover } from '@/components/ai/tool-box'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -69,35 +69,56 @@ function openOutline() {
 
 <template>
   <div class="toolbar-container border-b bg-background text-background-foreground">
-    <div class="mx-auto flex h-10 items-center gap-2 px-3 md:px-5">
+    <div class="mx-auto flex h-10 items-center gap-1 md:gap-2 px-3 md:px-5">
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openPolish">
-        <WandSparkles class="mr-2 size-4" /> 润色
+        <WandSparkles class="size-4 md:mr-2" />
+        <span class="hidden md:inline">润色</span>
       </Button>
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openExpand">
-        <PlusCircle class="mr-2 size-4" /> 扩展
+        <PlusCircle class="size-4 md:mr-2" />
+        <span class="hidden md:inline">扩展</span>
       </Button>
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openConnect">
-        <LinkIcon class="mr-2 size-4" /> 衔接
+        <LinkIcon class="size-4 md:mr-2" />
+        <span class="hidden md:inline">衔接</span>
       </Button>
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openTranslate">
-        <Globe class="mr-2 size-4" /> 翻译
+        <Globe class="size-4 md:mr-2" />
+        <span class="hidden md:inline">翻译</span>
       </Button>
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openSummarize">
-        <FileText class="mr-2 size-4" /> 摘要
+        <FileText class="size-4 md:mr-2" />
+        <span class="hidden md:inline">摘要</span>
       </Button>
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openGrammar">
-        <Check class="mr-2 size-4" /> 纠错
+        <Check class="size-4 md:mr-2" />
+        <span class="hidden md:inline">纠错</span>
       </Button>
 
       <Button variant="ghost" size="sm" :disabled="!editor" @click="uiStore.toggleAIImageDialog(true)">
-        <Wand2 class="mr-2 size-4" /> 文生图
+        <svg class="size-4 md:mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 14h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <path d="M6 14v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <rect x="13" y="3" width="8" height="8" rx="2" ry="2" stroke="currentColor" stroke-width="2" />
+          <circle cx="19" cy="6" r="1.5" stroke="currentColor" stroke-width="2" />
+          <path d="M14 10l2.5-3 3.5 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M4 4h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <path d="M8.5 4l-2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <path d="M8.5 4l-2-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <path d="M20 20h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <path d="M15.5 20l2-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <path d="M15.5 20l2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <span class="hidden md:inline">文生图</span>
       </Button>
 
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openContinue">
-        <PenLine class="mr-2 size-4" /> 续写
+        <PenLine class="size-4 md:mr-2" />
+        <span class="hidden md:inline">续写</span>
       </Button>
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openOutline">
-        <ListTree class="mr-2 size-4" /> 大纲
+        <ListTree class="size-4 md:mr-2" />
+        <span class="hidden md:inline">大纲</span>
       </Button>
 
       <Separator orientation="vertical" class="mx-1 h-5" />

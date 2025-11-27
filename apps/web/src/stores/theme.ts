@@ -43,7 +43,7 @@ export const useThemeStore = defineStore(`theme`, () => {
   const isUseIndent = store.reactive(addPrefix(`use_indent`), false)
 
   // 是否开启两端对齐
-  const isUseJustify = store.reactive(addPrefix(`use_justify`), false)
+  const isUseJustify = store.reactive(addPrefix(`use_justify`), true)
 
   // 预览宽度
   const previewWidth = store.reactive(`previewWidth`, widthOptions[0].value)
@@ -74,7 +74,7 @@ export const useThemeStore = defineStore(`theme`, () => {
     legend.value = defaultStyleConfig.legend
 
     isUseIndent.value = false
-    isUseJustify.value = false
+    isUseJustify.value = true
   }
 
   // 切换 highlight.js 代码主题

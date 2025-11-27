@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, ChevronDownIcon, Image as ImageIcon, Menu, Palette } from 'lucide-vue-next'
+import { Bot, ChevronDownIcon, Copy, Image as ImageIcon, Menu, Palette } from 'lucide-vue-next'
 import QuickCommandManager from '@/components/ai/chat-box/QuickCommandManager.vue'
 import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
@@ -365,13 +365,14 @@ async function copy() {
     </div>
 
     <!-- 右侧操作区 -->
-    <div class="space-x-2 flex flex-wrap items-center">
+    <div class="space-x-1 md:space-x-2 flex flex-wrap items-center">
       <!-- 复制按钮组 -->
       <div
         class="bg-background space-x-1 text-background-foreground flex items-center border rounded-md"
       >
         <Button variant="ghost" class="shadow-none text-sm px-2 md:px-4" @click="copy">
-          复制
+          <Copy class="size-4 md:mr-2" />
+          <span class="hidden md:inline">复制</span>
         </Button>
         <Separator orientation="vertical" class="h-5" />
         <DropdownMenu v-model="copyMode">
