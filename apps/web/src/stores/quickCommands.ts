@@ -2,7 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { store } from '@/utils/storage'
 import { ACTION_COMMANDS } from './quick-commands/actions'
-import { STYLE_COMMANDS } from './quick-commands/styles'
+import { CONNECT_COMMANDS } from './quick-commands/connect'
+import { EXPAND_COMMANDS } from './quick-commands/expand'
+import { GENERAL_COMMANDS } from './quick-commands/general'
+import { STYLE_COMMANDS, STYLE_IDS } from './quick-commands/styles'
 import { TITLE_COMMANDS } from './quick-commands/title'
 import { TONE_COMMANDS } from './quick-commands/tones'
 
@@ -32,6 +35,9 @@ const DEFAULT_COMMANDS: QuickCommandPersisted[] = [
   ...TITLE_COMMANDS,
   ...STYLE_COMMANDS,
   ...TONE_COMMANDS,
+  ...GENERAL_COMMANDS,
+  ...EXPAND_COMMANDS,
+  ...CONNECT_COMMANDS,
 ]
 
 export const useQuickCommands = defineStore(`quickCommands`, () => {
@@ -72,6 +78,7 @@ export const useQuickCommands = defineStore(`quickCommands`, () => {
         commands.value[i] = hydrate({ ...commands.value[i], template: cmd.template, label: cmd.label })
     }
     for (const cmd of DEFAULT_COMMANDS) ensure(cmd)
+    commands.value = commands.value.filter(c => !c.id.startsWith('style:') || STYLE_IDS.includes(c.id))
     await save()
   }
 

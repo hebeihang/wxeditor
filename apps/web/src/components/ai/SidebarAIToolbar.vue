@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, Image as ImageIcon, Settings2, Wand2 } from 'lucide-vue-next'
+import { Bot, Image as ImageIcon, Wand2 } from 'lucide-vue-next'
 import { useEditorStore } from '@/stores/editor'
 import { useUIStore } from '@/stores/ui'
 import AIAssistantPanel from './chat-box/AIAssistantPanel.vue'
@@ -204,7 +204,7 @@ onMounted(() => {
       title="展开AI工具栏"
       @click="toggleExpanded"
     >
-      <Settings2 class="h-4 w-4 text-white drop-shadow-sm group-hover:scale-110 transition-transform duration-200" />
+      <Wand2 class="h-4 w-4 text-white drop-shadow-sm group-hover:scale-110 transition-transform duration-200" />
 
       <!-- 选中文本提示气泡 -->
       <Transition name="hint-fade">

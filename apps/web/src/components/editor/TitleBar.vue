@@ -69,7 +69,9 @@ function isTitleCandidate(text: string): boolean {
 }
 
 watch(currentPost, (p) => {
-  titleInput.value = p?.title ?? ''
+  const next = p?.title ?? ''
+  if (next !== titleInput.value)
+    titleInput.value = next
 }, { immediate: true })
 
 function applyTitle(title: string) {
@@ -143,10 +145,8 @@ async function generateTitles() {
   }
 }
 
-function onInput(e: Event) {
-  const val = (e.target as HTMLInputElement).value
-  titleInput.value = val
-  postStore.renamePost(currentPostId.value, val)
+function onUpdateTitle(val: string | number) {
+  postStore.renamePost(currentPostId.value, String(val))
 }
 </script>
 
@@ -172,7 +172,7 @@ function onInput(e: Event) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Input :value="titleInput" placeholder="输入标题" class="flex-1" @input="onInput" />
+      <Input v-model="titleInput" placeholder="输入标题" class="flex-1" @update:model-value="onUpdateTitle" />
     </div>
   </div>
 </template>

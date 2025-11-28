@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Transaction } from '@codemirror/state'
-import { Pause, Settings, Wand2, X } from 'lucide-vue-next'
+import { Pause, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,6 +19,7 @@ import {
 import useAIConfigStore from '@/stores/aiConfig'
 import { useEditorStore } from '@/stores/editor'
 import { useQuickCommands } from '@/stores/quickCommands'
+import { useUIStore } from '@/stores/ui'
 import { store as kvStore } from '@/utils/storage'
 
 /* -------------------- props / emits -------------------- */
@@ -33,6 +34,7 @@ type ToolVariant
     | 'grammar'
     | 'continue'
     | 'spellcheck'
+    | 'image'
 
 const props = defineProps<{
   open: boolean
@@ -57,6 +59,8 @@ const error = ref(``)
 /* -------------------- store & refs -------------------- */
 const editorStore = useEditorStore()
 const quickCmdStore = useQuickCommands()
+const uiStore = useUIStore()
+const { toggleAIImageDialog } = uiStore
 const resultContainer = ref<HTMLElement | null>(null)
 const showDiff = ref(true)
 const diffHtml = ref(``)
@@ -68,29 +72,32 @@ const showNotes = ref(false)
 const getActionTemplate = (id: string) => quickCmdStore.commands.find(c => c.id === id)?.template || ''
 const actionOptions = computed<ActionOption[]>(() => [
   { value: `optimize`, label: `润色`, defaultPrompt: getActionTemplate(`action:optimize`) || `请优化文本，使其更通顺易读。` },
-  { value: `expand`, label: `补充`, defaultPrompt: getActionTemplate(`action:expand`) || `请根据上下文对文本进行扩展，增加细节与示例。` },
+  { value: `expand`, label: `扩展`, defaultPrompt: getActionTemplate(`action:expand`) || `请根据上下文对文本进行扩展，增加细节与示例。` },
   { value: `connect`, label: `衔接`, defaultPrompt: getActionTemplate(`action:connect`) || `使文本衔接更自然，补全隐含前提并说明。` },
   { value: `translate`, label: `翻译`, defaultPrompt: getActionTemplate(`action:translate-en`) || `将文本翻译为目标语言，保留术语并说明。` },
   { value: `summarize`, label: `摘要`, defaultPrompt: getActionTemplate(`action:summarize`) || `先一句话总括，再列出要点。` },
   { value: `grammar`, label: `纠错`, defaultPrompt: getActionTemplate(`action:grammar`) || `检测并修正拼写、语法、标点与风格不一致。` },
+  { value: `image`, label: `文生图`, defaultPrompt: `` },
   { value: `continue`, label: `续写`, defaultPrompt: getActionTemplate(`action:continue`) || `从当前文本结尾继续写，保持语境连贯。` },
-  { value: `outline`, label: `结构`, defaultPrompt: getActionTemplate(`action:outline`) || `生成层级化写作大纲，输出 Markdown 标题。` },
-  { value: `spellcheck`, label: `错别字纠正`, defaultPrompt: getActionTemplate(`action:grammar`) || `找出并纠正错别字、标点和语法错误。` },
+  { value: `outline`, label: `大纲`, defaultPrompt: getActionTemplate(`action:outline`) || `生成层级化写作大纲，输出 Markdown 标题。` },
   { value: `custom`, label: `自定义`, defaultPrompt: `` },
 ])
 const actionValues = computed<ToolVariant[]>(() => actionOptions.value.map(o => o.value as ToolVariant))
 
-const connectStyleId = ref<string>('')
-const connectToneId = ref<string>('none')
-const connectScope = ref<'句内衔接' | '句间衔接' | '段间衔接' | '全局重写'>('句间衔接')
-const connectPreserveLength = ref(false)
-const connectCustomPrompt = ref('')
+const connectTermsStr = kvStore.reactive<string>('ai_connect_terms', '[]')
+const selectedConnectIds = ref<string[]>([])
+try { selectedConnectIds.value = JSON.parse(connectTermsStr.value || '[]') }
+catch { selectedConnectIds.value = [] }
 
-const translateSourceLanguage = ref<'auto' | 'zh-CN' | 'en' | 'ja' | 'ko' | 'de' | 'fr' | 'it' | 'es' | 'pt'>('auto')
-const translateTargetLanguage = ref<'zh-CN' | 'en' | 'ja' | 'ko' | 'de' | 'fr' | 'it' | 'es' | 'pt'>('en')
-const translatePreserveNamedEntities = ref(true)
-const translateTerminology = ref<string>('{}')
-const translateFormalLevel = ref<'auto' | 'formal' | 'casual'>('auto')
+const translateSourceLanguage = kvStore.reactive<string>('ai_translate_source_lang', 'auto')
+const translateTargetLanguage = kvStore.reactive<string>('ai_translate_target_lang', 'en')
+const translatePreserveNamedEntities = kvStore.reactive<boolean>('ai_translate_preserve_named', true)
+const translateTerminology = kvStore.reactive<string>('ai_translate_termi', '{}')
+const translateFormalLevel = kvStore.reactive<string>('ai_translate_formal_level', 'auto')
+const translatePreserveFormatting = kvStore.reactive<boolean>('ai_translate_preserve_formatting', true)
+const translatePreserveNumbersUnits = kvStore.reactive<boolean>('ai_translate_numbers_units', true)
+const translateAutoConvertUnits = kvStore.reactive<boolean>('ai_translate_units_convert', false)
+const translateLocalizationMode = kvStore.reactive<string>('ai_translate_localization_mode', 'Off')
 
 function normalizePresetAction(val?: string): ToolVariant {
   if (val === 'translate-zh') {
@@ -214,6 +221,10 @@ watch(message, async () => {
 watch(selectedAction, (val) => {
   if (val !== `custom`)
     customPrompts.value = []
+  if (val === 'image') {
+    dialogVisible.value = false
+    toggleAIImageDialog(true)
+  }
 })
 
 // 当 dialogVisible 且 props.selectedText 变更时，更新原文并重置状态
@@ -259,12 +270,7 @@ function extractReplacementAndNotes(raw: string): { replacement: string, notes: 
       .replace(/<notes>[\s\S]*$/i, '')
       .trim()
     candidateRep = candidateRep.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '').trim()
-    let candidateLeading = raw
-      .replace(/<notes>[\s\S]*?<\/notes>/gi, '')
-      .replace(/<notes>[\s\S]*$/i, '')
-      .split(/<replacement>/i)[0]
-    candidateLeading = candidateLeading.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '').trim()
-    replacement = (candidateLeading.length > candidateRep.length ? candidateLeading : candidateRep)
+    replacement = candidateRep
   }
   if (!replacement) {
     let stripped = raw
@@ -305,6 +311,17 @@ function sanitizeAIContent(raw: string): string {
   s = s.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '')
   return s.trim()
 }
+
+function enforceStructure(original: string, candidate: string): string {
+  const hasHeading = /(?:^|\n)\s{0,3}#{1,6}\s/.test(original)
+  const hasList = /(?:^|\n)\s*[-*+]\s+/.test(original)
+  let s = candidate
+  if (!hasHeading)
+    s = s.replace(/(^|\n)\s{0,3}#{1,6}\s+/g, '$1')
+  if (!hasList)
+    s = s.replace(/(^|\n)\s*[-*+]\s+/g, '$1')
+  return s
+}
 function addPrompt(e: KeyboardEvent) {
   const input = e.target as HTMLInputElement
   const prompt = input.value.trim()
@@ -333,6 +350,21 @@ function resetState() {
   abortController.value = null
 }
 
+async function onGlossaryUpload(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file)
+    return
+  const text = await file.text()
+  try {
+    JSON.parse(text)
+    translateTerminology.value = text
+  }
+  catch {
+    // ignore invalid JSON
+  }
+}
+
 /* -------------------- AI call -------------------- */
 async function runAIAction() {
   let text = currentText.value.trim()
@@ -355,9 +387,12 @@ async function runAIAction() {
   const payload = {
     model: model.value,
     messages,
-    temperature: temperature.value,
-    max_tokens: maxToken.value,
+    temperature: (selectedAction.value === 'translate' ? Math.min(0.2, Number(temperature.value) || 0.2) : temperature.value),
+    max_tokens: (selectedAction.value === 'translate'
+      ? Math.min(Number(maxToken.value) || 1024, Math.max(64, Math.floor((text.length || 0) / 3) + 64))
+      : maxToken.value),
     stream: true,
+    stop: (selectedAction.value === 'translate' ? ['</replacement>'] : undefined),
   }
 
   const headers: Record<string, string> = {
@@ -405,13 +440,15 @@ async function runAIAction() {
           if (delta?.trim()) {
             message.value += delta
             const parsed = extractReplacementAndNotes(message.value)
-            replacementText.value = parsed.replacement
-            notesText.value = parsed.notes
-            hasResult.value = true
-            const usedContent = sanitizeAIContent(replacementText.value || message.value)
-            if (showDiff.value)
-              diffHtml.value = buildDiffHtml(currentText.value, usedContent)
-            originalDiffHtml.value = buildOriginalDeletionsHtml(currentText.value, usedContent)
+            if (parsed.replacement?.trim()) {
+              replacementText.value = parsed.replacement
+              notesText.value = parsed.notes
+              hasResult.value = true
+              const usedContent = enforceStructure(currentText.value, sanitizeAIContent(replacementText.value))
+              if (showDiff.value)
+                diffHtml.value = buildDiffHtml(currentText.value, usedContent)
+              originalDiffHtml.value = buildOriginalDeletionsHtml(currentText.value, usedContent)
+            }
           }
         }
         catch {}
@@ -486,18 +523,43 @@ function buildActionPrompt(inputText: string): string {
     }
     case 'expand': {
       const base = `请根据上下文对文本进行扩展，增加细节与示例，必要处使用“示例：”标注。将用于替换原文的扩展结果置于 <replacement>...</replacement>，将说明或扩展依据置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}`
-      return `${base}${extra}`
+      const expandTermsStr = kvStore.reactive<string>('ai_expand_terms', '[]')
+      let ids: string[] = []
+      try { ids = JSON.parse(expandTermsStr.value || '[]') }
+      catch { ids = [] }
+      const cmds = ids
+        .map(id => quickCmdStore.commands.find(c => c.id === id))
+        .filter(Boolean) as { id: string, label: string, template: string }[]
+      const termsSection = cmds.length
+        ? `\n扩写功能：\n${cmds.map(c => `- ${c.label}：${c.template.replace(/\n\s*\{\{\s*sel\s*\}\}/i, '').trim()}`).join('\n')}`
+        : ''
+      return `${base}${termsSection}${extra}`
     }
     case 'connect': {
-      const style = getStyleLabel(connectStyleId.value)
-      const tone = getToneLabel(connectToneId.value)
-      const preserve = connectPreserveLength.value ? '尽量保持原文长度。' : ''
-      const base = `在下列范围（${connectScope.value}）内改写以改善衔接：\n\n${inputText}\n\n风格：${style}；情感：${tone}。${preserve}将用于替换原文的衔接后文本置于 <replacement>...</replacement>，将修改原因与逻辑说明置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。`
-      const custom = connectCustomPrompt.value?.trim() ? `\n自定义指令：${connectCustomPrompt.value.trim()}` : ''
-      return `${base}${custom}${extra}`
+      const base = `请在不改变用户原意的前提下对以下文本进行衔接优化，使上下文自然连贯。将用于替换原文的衔接后文本置于 <replacement>...</replacement>，将修改原因与逻辑说明置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}`
+      let ids: string[] = []
+      try { ids = JSON.parse(connectTermsStr.value || '[]') }
+      catch { ids = [] }
+      const cmds = ids
+        .map(id => quickCmdStore.commands.find(c => c.id === id))
+        .filter(Boolean) as { id: string, label: string, template: string }[]
+      const termsSection = cmds.length
+        ? `\n衔接功能：\n${cmds.map(c => `- ${c.label}：${c.template.replace(/\n\s*\{\{\s*sel\s*\}\}/i, '').trim()}`).join('\n')}`
+        : ''
+      return `${base}${termsSection}${extra}`
     }
     case 'translate': {
-      const preserve = translatePreserveNamedEntities.value ? '保留专有名词（不翻译人名/公司名）。' : ''
+      const preserve = translatePreserveNamedEntities.value ? '保留专有名词（人名、公司名、产品名、地名、技术词）原文不翻译。' : ''
+      const fmt = translatePreserveFormatting.value ? '保留原文格式（换行、标题层级、粗体/斜体、列表、Markdown/HTML 标记）。' : ''
+      const num = translatePreserveNumbersUnits.value ? '保持原文数字与货币格式（例如 1,000 / ¥ / $ / €）。' : ''
+      const unit = translatePreserveNumbersUnits.value
+        ? (translateAutoConvertUnits.value ? '在合适场景自动进行公制/英制单位转换。' : '不要进行单位转换。')
+        : ''
+      const loc = translateLocalizationMode.value === 'Mild'
+        ? '本地化模式：轻度。在不改变原意的前提下，适度调整为目标语言常用表达。'
+        : translateLocalizationMode.value === 'Strong'
+          ? '本地化模式：强。优先目标语言文化的常用表达与可读性。'
+          : '本地化模式：关闭。以直译为主，仅在必要处做最小调整。'
       let terminologySection = ''
       try {
         const t = translateTerminology.value?.trim() || '{}'
@@ -507,7 +569,7 @@ function buildActionPrompt(inputText: string): string {
       catch {
         terminologySection = `术语表：{}。`
       }
-      const base = `将以下文本从 ${translateSourceLanguage.value} 翻译到 ${translateTargetLanguage.value}，${preserve}${terminologySection}遵循用语等级 ${translateFormalLevel.value}：\n\n${inputText}\n\n请在首行标注目标语言标签（${translateTargetLanguage.value}）。将译文置于 <replacement>...</replacement>，将“术语与决策说明”置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。`
+      const base = `将以下文本从 ${translateSourceLanguage.value} 翻译到 ${translateTargetLanguage.value}，${preserve}${fmt}${num}${unit}${terminologySection}语域（Register）：${translateFormalLevel.value}。${loc}\n\n严格限制：不得扩写或增添任何新信息、例子、解释；逐句对齐并保持段落结构不变；句子数量与段落数量尽量与原文一致；整体长度与原文一致（允许极少量误差）；如原文不含以 # 或 -/* 开头的行，译文也不得添加标题或项目符号。\n\n${inputText}\n\n只输出 <replacement>...</replacement>，不要输出 <notes>。输出 Markdown。不要使用除 <replacement> 外的任何标签。`
       return `${base}${extra}`
     }
     case 'summarize': {
@@ -558,7 +620,7 @@ function stopAI() {
 function replaceText() {
   const editorView = toRaw(editorStore.editor!)!
   const sel = editorView.state.selection.main
-  let content = sanitizeAIContent(replacementText.value || message.value)
+  let content = enforceStructure(currentText.value, sanitizeAIContent(replacementText.value || message.value))
   content = normalizeMarkdown(content)
   if (selectedAction.value !== 'outline' && selectedAction.value !== 'summarize')
     content = fixLeadingBullet(content)
@@ -721,30 +783,14 @@ function fixLeadingBullet(text: string): string {
       <DialogHeader class="space-y-1 flex flex-col items-start px-6 pt-6 pb-4">
         <div class="space-x-1 flex items-center">
           <DialogTitle>AI 工具箱</DialogTitle>
-
-          <Button
-            :title="configVisible ? 'AI 工具箱' : '配置参数'"
-            :aria-label="configVisible ? 'AI 工具箱' : '配置参数'"
-            variant="ghost"
-            size="icon"
-            @click="configVisible = !configVisible"
-          >
-            <Wand2 v-if="configVisible" class="h-4 w-4" />
-            <Settings v-else class="h-4 w-4" />
-          </Button>
         </div>
       </DialogHeader>
 
       <!-- ============ 内容区域 ============ -->
-      <!-- config panel -->
-      <AIConfig
-        v-if="configVisible"
-        class="border-border mx-6 mb-4 w-auto border rounded-md p-4"
-        @saved="() => (configVisible = false)"
-      />
+      <!-- config panel (hidden) -->
 
       <!-- main content -->
-      <div v-else class="custom-scroll space-y-3 flex-1 overflow-y-auto px-6 pb-3">
+      <div class="custom-scroll space-y-3 flex-1 overflow-y-auto px-6 pb-3">
         <!-- action selector -->
         <div>
           <div class="mb-1.5 text-sm font-medium">
@@ -768,7 +814,7 @@ function fixLeadingBullet(text: string): string {
           </Select>
         </div>
 
-        <div v-if="selectedAction === 'continue'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div v-if="false" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div class="mb-1 text-sm font-medium">
               延续文风
@@ -841,7 +887,7 @@ function fixLeadingBullet(text: string): string {
           </div>
         </div>
 
-        <div v-if="selectedAction === 'outline'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div v-if="false" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div class="mb-1 text-sm font-medium">
               目标文风
@@ -876,83 +922,40 @@ function fixLeadingBullet(text: string): string {
             <label for="includeParagraphSamples" class="text-sm">为要点生成示例段落（简短）</label>
           </div>
         </div>
-        <div v-if="selectedAction === 'connect'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <div class="mb-1 text-sm font-medium">
-              文风
-            </div>
-            <Select v-model="connectStyleId">
-              <SelectTrigger class="w-full">
-                <SelectValue placeholder="选择文风" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="opt in quickCmdStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
-                    {{ opt.label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+        <div v-if="false" class="space-y-2">
+          <div class="mb-1.5 text-sm font-medium">
+            衔接功能
           </div>
-          <div>
-            <div class="mb-1 text-sm font-medium">
-              情感
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div
+              v-for="cmd in quickCmdStore.commands.filter(c => c.id.startsWith('connect-mode:'))"
+              :key="cmd.id"
+              class="border rounded-md p-2"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-start gap-2">
+                  <input
+                    :id="`connect-id-${cmd.id}`"
+                    type="checkbox"
+                    :checked="selectedConnectIds.includes(cmd.id)"
+                    @change="(e: any) => {
+                      const checked = e.target.checked
+                      if (checked && !selectedConnectIds.includes(cmd.id)) selectedConnectIds.push(cmd.id)
+                      else if (!checked) selectedConnectIds = selectedConnectIds.filter(k => k !== cmd.id)
+                      try { connectTermsStr.value = JSON.stringify(Array.from(new Set(selectedConnectIds))) }
+                      catch { connectTermsStr.value = '[]' }
+                    }"
+                  >
+                  <label :for="`connect-id-${cmd.id}`" class="text-sm">
+                    <span class="font-medium">{{ cmd.label }}</span>
+                  </label>
+                </div>
+              </div>
             </div>
-            <Select v-model="connectToneId">
-              <SelectTrigger class="w-full">
-                <SelectValue placeholder="选择情感（可选）" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="none">
-                    无
-                  </SelectItem>
-                  <SelectItem v-for="opt in quickCmdStore.commands.filter(c => c.id.startsWith('tone:'))" :key="opt.id" :value="opt.id">
-                    {{ opt.label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <div class="mb-1 text-sm font-medium">
-              衔接范围
-            </div>
-            <Select v-model="connectScope">
-              <SelectTrigger class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="句内衔接">
-                    句内衔接
-                  </SelectItem>
-                  <SelectItem value="句间衔接">
-                    句间衔接
-                  </SelectItem>
-                  <SelectItem value="段间衔接">
-                    段间衔接
-                  </SelectItem>
-                  <SelectItem value="全局重写">
-                    全局重写
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="flex items-center gap-2">
-            <input id="connectPreserveLength" v-model="connectPreserveLength" type="checkbox">
-            <label for="connectPreserveLength" class="text-sm">尽量保持原文长度</label>
-          </div>
-          <div class="sm:col-span-2">
-            <div class="mb-1 text-sm font-medium">
-              自定义指令
-            </div>
-            <textarea v-model="connectCustomPrompt" rows="3" class="w-full bg-transparent border rounded px-2 py-1 text-sm" />
           </div>
         </div>
 
-        <div v-if="selectedAction === 'translate'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div v-if="false" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div class="mb-1 text-sm font-medium">
               源语言
@@ -964,34 +967,34 @@ function fixLeadingBullet(text: string): string {
               <SelectContent>
                 <SelectGroup>
                   <SelectItem value="auto">
-                    auto
+                    Auto-detect
                   </SelectItem>
                   <SelectItem value="zh-CN">
-                    zh-CN
+                    Chinese
                   </SelectItem>
                   <SelectItem value="en">
-                    en
+                    English
                   </SelectItem>
                   <SelectItem value="ja">
-                    ja
+                    日本語
                   </SelectItem>
                   <SelectItem value="ko">
-                    ko
+                    한국어
                   </SelectItem>
                   <SelectItem value="de">
-                    de
+                    Deutsch
                   </SelectItem>
                   <SelectItem value="fr">
-                    fr
+                    Français
                   </SelectItem>
                   <SelectItem value="it">
-                    it
+                    Italiano
                   </SelectItem>
                   <SelectItem value="es">
-                    es
+                    Español
                   </SelectItem>
                   <SelectItem value="pt">
-                    pt
+                    Português
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -1008,31 +1011,31 @@ function fixLeadingBullet(text: string): string {
               <SelectContent>
                 <SelectGroup>
                   <SelectItem value="zh-CN">
-                    zh-CN
+                    Chinese
                   </SelectItem>
                   <SelectItem value="en">
-                    en
+                    English
                   </SelectItem>
                   <SelectItem value="ja">
-                    ja
+                    日本語
                   </SelectItem>
                   <SelectItem value="ko">
-                    ko
+                    한국어
                   </SelectItem>
                   <SelectItem value="de">
-                    de
+                    Deutsch
                   </SelectItem>
                   <SelectItem value="fr">
-                    fr
+                    Français
                   </SelectItem>
                   <SelectItem value="it">
-                    it
+                    Italiano
                   </SelectItem>
                   <SelectItem value="es">
-                    es
+                    Español
                   </SelectItem>
                   <SelectItem value="pt">
-                    pt
+                    Português
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -1053,13 +1056,60 @@ function fixLeadingBullet(text: string): string {
               <SelectContent>
                 <SelectGroup>
                   <SelectItem value="auto">
-                    auto
+                    Auto
                   </SelectItem>
                   <SelectItem value="formal">
-                    formal
+                    Formal
+                  </SelectItem>
+                  <SelectItem value="neutral">
+                    Neutral
                   </SelectItem>
                   <SelectItem value="casual">
-                    casual
+                    Casual
+                  </SelectItem>
+                  <SelectItem value="polite">
+                    Polite
+                  </SelectItem>
+                  <SelectItem value="business">
+                    Business
+                  </SelectItem>
+                  <SelectItem value="academic">
+                    Academic
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="translatePreserveFormatting" v-model="translatePreserveFormatting" type="checkbox">
+            <label for="translatePreserveFormatting" class="text-sm">保留格式（换行/标题/列表/Markdown/HTML）</label>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="translatePreserveNumbersUnits" v-model="translatePreserveNumbersUnits" type="checkbox">
+            <label for="translatePreserveNumbersUnits" class="text-sm">保持数字与货币格式</label>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="translateAutoConvertUnits" v-model="translateAutoConvertUnits" type="checkbox">
+            <label for="translateAutoConvertUnits" class="text-sm">自动进行单位转换（公制/英制）</label>
+          </div>
+          <div>
+            <div class="mb-1 text-sm font-medium">
+              本地化模式
+            </div>
+            <Select v-model="translateLocalizationMode">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="Off">
+                    Off
+                  </SelectItem>
+                  <SelectItem value="Mild">
+                    Mild
+                  </SelectItem>
+                  <SelectItem value="Strong">
+                    Strong
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -1069,11 +1119,12 @@ function fixLeadingBullet(text: string): string {
             <div class="mb-1 text-sm font-medium">
               术语表（可编辑，JSON）
             </div>
+            <input type="file" accept=".json,application/json" class="w-full text-sm" @change="onGlossaryUpload">
             <textarea v-model="translateTerminology" rows="4" class="w-full bg-transparent border rounded px-2 py-1 text-sm" placeholder="{&quot;产品名&quot;:&quot;ProductX&quot;}" />
           </div>
         </div>
 
-        <div v-if="selectedAction === 'summarize'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div v-if="false" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div class="mb-1 text-sm font-medium">
               输出文风
@@ -1127,7 +1178,7 @@ function fixLeadingBullet(text: string): string {
           </div>
         </div>
 
-        <div v-if="selectedAction === 'grammar'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div v-if="false" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div class="mb-1 text-sm font-medium">
               自动修正策略
@@ -1242,7 +1293,7 @@ function fixLeadingBullet(text: string): string {
         </div>
 
         <!-- result -->
-        <div v-if="message">
+        <div v-if="hasResult || message">
           <div class="mb-1.5 text-sm font-medium">
             可替换文本（高亮变化）
           </div>
@@ -1250,9 +1301,9 @@ function fixLeadingBullet(text: string): string {
             ref="resultContainer"
             class="custom-scroll border-border bg-background max-h-40 min-h-[60px] overflow-y-auto whitespace-pre-wrap border rounded px-3 py-2 text-sm"
           >
-            <div v-if="showDiff" v-html="diffHtml" />
+            <div v-if="showDiff && hasResult" v-html="diffHtml" />
             <div v-else>
-              {{ replacementText || message }}
+              {{ replacementText }}
             </div>
           </div>
           <div v-if="notesText" class="mt-2">

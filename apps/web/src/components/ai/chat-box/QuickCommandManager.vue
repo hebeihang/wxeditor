@@ -56,9 +56,7 @@ function addCmd() {
   template.value = ``
 }
 
-function onSave() {
-  dialogOpen.value = false
-}
+/* moved below reactive declarations to satisfy no-use-before-define */
 
 /* ---------- 共享设置（与菜单一致的键名） ---------- */
 const styleId = kvStore.reactive<string>('ai_style_id', 'style:business')
@@ -70,23 +68,43 @@ const polishStructureOptimization = kvStore.reactive<string>('ai_polish_structur
 const polishReadabilityLevel = kvStore.reactive<string>('ai_polish_readability_level', '大众读者（高中）')
 const polishCustomPrompt = kvStore.reactive<string>('ai_polish_custom', '')
 
-const expandMode = kvStore.reactive<string>('ai_expand_mode', '倍数扩写')
-const expandFactor = kvStore.reactive<number>('ai_expand_factor', 2.0)
-const targetWords = kvStore.reactive<number>('ai_expand_target_words', 300)
-const addExamples = kvStore.reactive<boolean>('ai_expand_add_examples', true)
-const expandCustomPrompt = kvStore.reactive<string>('ai_expand_custom', '')
+const expandTermsStr = kvStore.reactive<string>('ai_expand_terms', '[]')
+const selectedExpandIds = ref<string[]>([])
+try {
+  selectedExpandIds.value = JSON.parse(expandTermsStr.value || '[]')
+}
+catch {
+  selectedExpandIds.value = []
+}
 
-const connectStyleId = kvStore.reactive<string>('ai_connect_style_id', '')
-const connectToneId = kvStore.reactive<string>('ai_connect_tone_id', 'none')
-const connectScope = kvStore.reactive<string>('ai_connect_scope', '句间衔接')
-const connectPreserveLength = kvStore.reactive<boolean>('ai_connect_preserve_len', false)
-const connectCustomPrompt = kvStore.reactive<string>('ai_connect_custom', '')
+const connectTermsStr = kvStore.reactive<string>('ai_connect_terms', '[]')
+const selectedConnectIds = ref<string[]>([])
+try {
+  selectedConnectIds.value = JSON.parse(connectTermsStr.value || '[]')
+}
+catch {
+  selectedConnectIds.value = []
+}
+
+function onSave() {
+  try {
+    expandTermsStr.value = JSON.stringify(Array.from(new Set(selectedExpandIds.value)))
+  }
+  catch {
+    expandTermsStr.value = '[]'
+  }
+  dialogOpen.value = false
+}
 
 const translateSourceLanguage = kvStore.reactive<string>('ai_translate_source_lang', 'auto')
 const translateTargetLanguage = kvStore.reactive<string>('ai_translate_target_lang', 'en')
 const translatePreserveNamedEntities = kvStore.reactive<boolean>('ai_translate_preserve_named', true)
 const translateTerminology = kvStore.reactive<string>('ai_translate_termi', '{}')
 const translateFormalLevel = kvStore.reactive<string>('ai_translate_formal_level', 'auto')
+const translatePreserveFormatting = kvStore.reactive<boolean>('ai_translate_preserve_formatting', true)
+const translatePreserveNumbersUnits = kvStore.reactive<boolean>('ai_translate_numbers_units', true)
+const translateAutoConvertUnits = kvStore.reactive<boolean>('ai_translate_units_convert', false)
+const translateLocalizationMode = kvStore.reactive<string>('ai_translate_localization_mode', 'Off')
 
 const summarizeStyleId = kvStore.reactive<string>('ai_summarize_style_id', '')
 const summarizeCompressionMode = kvStore.reactive<string>('ai_summarize_mode', '百分比')
@@ -143,21 +161,17 @@ watch([
   polishStructureOptimization,
   polishReadabilityLevel,
   polishCustomPrompt,
-  expandMode,
-  expandFactor,
-  targetWords,
-  addExamples,
-  expandCustomPrompt,
-  connectStyleId,
-  connectToneId,
-  connectScope,
-  connectPreserveLength,
-  connectCustomPrompt,
+  expandTermsStr,
+  connectTermsStr,
   translateSourceLanguage,
   translateTargetLanguage,
   translatePreserveNamedEntities,
   translateTerminology,
   translateFormalLevel,
+  translatePreserveFormatting,
+  translatePreserveNumbersUnits,
+  translateAutoConvertUnits,
+  translateLocalizationMode,
   summarizeStyleId,
   summarizeCompressionMode,
   summarizeCompressionValue,
@@ -177,6 +191,19 @@ watch([
   outlineTargetSections,
   includeParagraphSamples,
 ], () => {})
+
+async function onGlossaryUpload(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file)
+    return
+  const text = await file.text()
+  try {
+    JSON.parse(text)
+    translateTerminology.value = text
+  }
+  catch {}
+}
 </script>
 
 <template>
@@ -287,247 +314,271 @@ watch([
       </div>
 
       <!-- 各功能设置面板：与菜单内设置一致，移至浮窗 -->
-      <div v-if="mode === 'optimize'" class="space-y-3 mt-4 border rounded-md p-3">
-        <Label class="mb-1">文风</Label>
-        <Select v-model="styleId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
-                {{ opt.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+      <div v-if="mode === 'optimize'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 border rounded-md p-3">
+        <div>
+          <Label class="mb-1">文风</Label>
+          <Select v-model="styleId">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
+                  {{ opt.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Label class="mb-1">情感（可选）</Label>
-        <Select v-model="toneId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="none">
-                无
-              </SelectItem>
-              <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('tone:'))" :key="opt.id" :value="opt.id">
-                {{ opt.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <div>
+          <Label class="mb-1">情感（可选）</Label>
+          <Select v-model="toneId">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="none">
+                  无
+                </SelectItem>
+                <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('tone:'))" :key="opt.id" :value="opt.id">
+                  {{ opt.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between sm:col-span-2">
           <Label>保留专有名词</Label>
           <Switch v-model:checked="preserveNames" />
         </div>
 
-        <Label class="mb-1">润色强度（0-100）</Label>
-        <NumberField v-model="polishStrength" :min="0" :max="100" :step="5">
-          <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
-        </NumberField>
+        <div>
+          <Label class="mb-1">润色强度（0-100）</Label>
+          <NumberField v-model="polishStrength" :min="0" :max="100" :step="5">
+            <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
+          </NumberField>
+        </div>
 
-        <Label class="mb-1">长度偏好</Label>
-        <Select v-model="polishLengthPreference">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="保持长度">
-              保持长度
-            </SelectItem>
-            <SelectItem value="不超过原文">
-              不超过原文
-            </SelectItem>
-            <SelectItem value="稍微扩写（10-20%）">
-              稍微扩写（10-20%）
-            </SelectItem>
-            <SelectItem value="适度扩写">
-              适度扩写
-            </SelectItem>
-            <SelectItem value="显著扩写">
-              显著扩写
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <div>
+          <Label class="mb-1">长度偏好</Label>
+          <Select v-model="polishLengthPreference">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="保持长度">
+                保持长度
+              </SelectItem>
+              <SelectItem value="不超过原文">
+                不超过原文
+              </SelectItem>
+              <SelectItem value="稍微扩写（10-20%）">
+                稍微扩写（10-20%）
+              </SelectItem>
+              <SelectItem value="适度扩写">
+                适度扩写
+              </SelectItem>
+              <SelectItem value="显著扩写">
+                显著扩写
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Label class="mb-1">结构优化</Label>
-        <Select v-model="polishStructureOptimization">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">
-              none
-            </SelectItem>
-            <SelectItem value="mild">
-              mild
-            </SelectItem>
-            <SelectItem value="strong">
-              strong
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <div>
+          <Label class="mb-1">结构优化</Label>
+          <Select v-model="polishStructureOptimization">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">
+                none
+              </SelectItem>
+              <SelectItem value="mild">
+                mild
+              </SelectItem>
+              <SelectItem value="strong">
+                strong
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Label class="mb-1">阅读难度</Label>
-        <Select v-model="polishReadabilityLevel">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="大众读者（小学）">
-              大众读者（小学）
-            </SelectItem>
-            <SelectItem value="大众读者（初中）">
-              大众读者（初中）
-            </SelectItem>
-            <SelectItem value="大众读者（高中）">
-              大众读者（高中）
-            </SelectItem>
-            <SelectItem value="专业读者">
-              专业读者
-            </SelectItem>
-            <SelectItem value="专家读者">
-              专家读者
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <div>
+          <Label class="mb-1">阅读难度</Label>
+          <Select v-model="polishReadabilityLevel">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="大众读者（小学）">
+                  大众读者（小学）
+                </SelectItem>
+                <SelectItem value="大众读者（初中）">
+                  大众读者（初中）
+                </SelectItem>
+                <SelectItem value="大众读者（高中）">
+                  大众读者（高中）
+                </SelectItem>
+                <SelectItem value="专业读者">
+                  专业读者
+                </SelectItem>
+                <SelectItem value="专家读者">
+                  专家读者
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Label class="mb-1">自定义提示词</Label>
-        <Textarea v-model="polishCustomPrompt" rows="2" placeholder="例如：使语言更口语化，保留技术术语。" />
+        <div class="sm:col-span-2">
+          <Label class="mb-1">自定义提示词</Label>
+          <Textarea v-model="polishCustomPrompt" rows="2" placeholder="例如：使语言更口语化，保留技术术语。" />
+        </div>
       </div>
 
       <div v-if="mode === 'expand'" class="space-y-3 mt-4 border rounded-md p-3">
-        <Label class="mb-1">文风</Label>
-        <Select v-model="styleId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
-                {{ opt.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">情感（可选）</Label>
-        <Select v-model="toneId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="">
-                无
-              </SelectItem>
-              <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('tone:'))" :key="opt.id" :value="opt.id">
-                {{ opt.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">扩写模式</Label>
-        <Select v-model="expandMode">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="倍数扩写">
-              倍数扩写
-            </SelectItem>
-            <SelectItem value="目标字数">
-              目标字数
-            </SelectItem>
-            <SelectItem value="补充要点">
-              补充要点
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">扩写倍数</Label>
-        <NumberField v-model="expandFactor" :min="1" :max="10" :step="0.5">
-          <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
-        </NumberField>
-
-        <Label class="mb-1">目标字数</Label>
-        <NumberField v-model="targetWords" :min="50" :max="10000" :step="50">
-          <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
-        </NumberField>
-
-        <div class="flex items-center justify-between">
-          <Label>添加示例/案例</Label>
-          <Switch v-model:checked="addExamples" />
+        <div class="text-sm font-medium">
+          扩写模式
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div
+            v-for="cmd in qcStore.commands.filter(c => c.id.startsWith('expand-mode:'))"
+            :key="cmd.id"
+            class="border rounded-md p-2"
+          >
+            <template v-if="editingId === cmd.id">
+              <div class="space-y-2">
+                <Input v-model="editLabel" placeholder="指令名称" />
+                <Textarea v-model="editTemplate" rows="2" placeholder="模板内容，支持 {{sel}} 占位" />
+                <div class="flex justify-end gap-2">
+                  <Button size="xs" @click="saveEdit">
+                    保存
+                  </Button>
+                  <Button variant="ghost" size="xs" @click="cancelEdit">
+                    取消
+                  </Button>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-start gap-2">
+                  <input
+                    :id="`expand-id-${cmd.id}`"
+                    type="checkbox"
+                    :checked="selectedExpandIds.includes(cmd.id)"
+                    @change="(e: any) => {
+                      const checked = e.target.checked
+                      if (checked && !selectedExpandIds.includes(cmd.id)) selectedExpandIds.push(cmd.id)
+                      else if (!checked) selectedExpandIds = selectedExpandIds.filter(k => k !== cmd.id)
+                    }"
+                  >
+                  <label :for="`expand-id-${cmd.id}`" class="text-sm">
+                    <span class="font-medium">{{ cmd.label }}</span>
+                  </label>
+                </div>
+                <div class="flex gap-1">
+                  <Button variant="ghost" size="xs" @click="beginEdit({ id: cmd.id, label: cmd.label, template: cmd.template })">
+                    编辑
+                  </Button>
+                  <Button variant="outline" size="xs" @click="() => { qcStore.remove(cmd.id); selectedExpandIds = selectedExpandIds.filter(k => k !== cmd.id) }">
+                    删除
+                  </Button>
+                </div>
+              </div>
+            </template>
+          </div>
         </div>
 
-        <Label class="mb-1">自定义提示词</Label>
-        <Textarea v-model="expandCustomPrompt" rows="2" />
+        <!-- 新增表单 -->
+        <div class="space-y-2">
+          <Input v-model="label" placeholder="指令名称 (如：补充案例)" />
+          <Textarea v-model="template" rows="2" placeholder="模板，可用 {{sel}} 占位" />
+          <div class="flex justify-end">
+            <Button variant="secondary" size="xs" @click="() => { if (label && template) { qcStore.add(label, template, `expand-mode:${crypto.randomUUID()}`); label = ''; template = ''; } }">
+              添加新提示词
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div v-if="mode === 'connect'" class="space-y-3 mt-4 border rounded-md p-3">
-        <Label class="mb-1">文风</Label>
-        <Select v-model="connectStyleId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
-                {{ opt.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">情感</Label>
-        <Select v-model="connectToneId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="none">
-                无
-              </SelectItem>
-              <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('tone:'))" :key="opt.id" :value="opt.id">
-                {{ opt.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">衔接范围</Label>
-        <Select v-model="connectScope">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="句内衔接">
-              句内衔接
-            </SelectItem>
-            <SelectItem value="句间衔接">
-              句间衔接
-            </SelectItem>
-            <SelectItem value="段间衔接">
-              段间衔接
-            </SelectItem>
-            <SelectItem value="全局重写">
-              全局重写
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div class="flex items-center justify-between">
-          <Label>尽量保持原文长度</Label>
-          <Switch v-model:checked="connectPreserveLength" />
+        <div class="text-sm font-medium">
+          衔接功能
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div
+            v-for="cmd in qcStore.commands.filter(c => c.id.startsWith('connect-mode:'))"
+            :key="cmd.id"
+            class="border rounded-md p-2"
+          >
+            <template v-if="editingId === cmd.id">
+              <div class="space-y-2">
+                <Input v-model="editLabel" placeholder="指令名称" />
+                <Textarea v-model="editTemplate" rows="2" placeholder="模板内容，支持 {{sel}} 占位" />
+                <div class="flex justify-end gap-2">
+                  <Button size="xs" @click="saveEdit">
+                    保存
+                  </Button>
+                  <Button variant="ghost" size="xs" @click="cancelEdit">
+                    取消
+                  </Button>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-start gap-2">
+                  <input
+                    :id="`connect-id-${cmd.id}`"
+                    type="checkbox"
+                    :checked="selectedConnectIds.includes(cmd.id)"
+                    @change="(e: any) => {
+                      const checked = e.target.checked
+                      if (checked && !selectedConnectIds.includes(cmd.id)) selectedConnectIds.push(cmd.id)
+                      else if (!checked) selectedConnectIds = selectedConnectIds.filter(k => k !== cmd.id)
+                      try { connectTermsStr.value = JSON.stringify(Array.from(new Set(selectedConnectIds))) }
+                      catch { connectTermsStr.value = '[]' }
+                    }"
+                  >
+                  <label :for="`connect-id-${cmd.id}`" class="text-sm">
+                    <span class="font-medium">{{ cmd.label }}</span>
+                  </label>
+                </div>
+                <div class="flex gap-1">
+                  <Button variant="ghost" size="xs" @click="beginEdit({ id: cmd.id, label: cmd.label, template: cmd.template })">
+                    编辑
+                  </Button>
+                  <Button
+                    variant="outline" size="xs" @click="() => {
+                      qcStore.remove(cmd.id); selectedConnectIds = selectedConnectIds.filter(k => k !== cmd.id); try { connectTermsStr.value = JSON.stringify(Array.from(new Set(selectedConnectIds))) }
+                      catch { connectTermsStr.value = '[]' }
+                    }"
+                  >
+                    删除
+                  </Button>
+                </div>
+              </div>
+            </template>
+          </div>
         </div>
 
-        <Label class="mb-1">自定义指令</Label>
-        <Textarea v-model="connectCustomPrompt" rows="2" />
+        <!-- 新增表单 -->
+        <div class="space-y-2">
+          <Input v-model="label" placeholder="指令名称 (如：逻辑衔接)" />
+          <Textarea v-model="template" rows="2" placeholder="模板，可用 {{sel}} 占位" />
+          <div class="flex justify-end">
+            <Button variant="secondary" size="xs" @click="() => { if (label && template) { qcStore.add(label, template, `connect-mode:${crypto.randomUUID()}`); label = ''; template = ''; } }">
+              添加新提示词
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div v-if="mode === 'translate'" class="space-y-3 mt-4 border rounded-md p-3">
@@ -538,34 +589,34 @@ watch([
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="auto">
-              auto
+              Auto-detect
             </SelectItem>
             <SelectItem value="zh-CN">
-              zh-CN
+              Chinese
             </SelectItem>
             <SelectItem value="en">
-              en
+              English
             </SelectItem>
             <SelectItem value="ja">
-              ja
+              日本語
             </SelectItem>
             <SelectItem value="ko">
-              ko
+              한국어
             </SelectItem>
             <SelectItem value="de">
-              de
+              Deutsch
             </SelectItem>
             <SelectItem value="fr">
-              fr
+              Français
             </SelectItem>
             <SelectItem value="it">
-              it
+              Italiano
             </SelectItem>
             <SelectItem value="es">
-              es
+              Español
             </SelectItem>
             <SelectItem value="pt">
-              pt
+              Português
             </SelectItem>
           </SelectContent>
         </Select>
@@ -576,47 +627,62 @@ watch([
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="zh-CN">
+              Chinese
+            </SelectItem>
             <SelectItem value="en">
-              en
+              English
             </SelectItem>
             <SelectItem value="ja">
-              ja
+              日本語
             </SelectItem>
             <SelectItem value="ko">
-              ko
+              한국어
             </SelectItem>
             <SelectItem value="de">
-              de
+              Deutsch
             </SelectItem>
             <SelectItem value="fr">
-              fr
+              Français
             </SelectItem>
             <SelectItem value="it">
-              it
+              Italiano
             </SelectItem>
             <SelectItem value="es">
-              es
+              Español
             </SelectItem>
             <SelectItem value="pt">
-              pt
+              Português
             </SelectItem>
           </SelectContent>
         </Select>
 
-        <Label class="mb-1">用语等级</Label>
+        <Label class="mb-1">用语等级（Register）</Label>
         <Select v-model="translateFormalLevel">
           <SelectTrigger class="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="auto">
-              auto
+              Auto
             </SelectItem>
             <SelectItem value="formal">
-              formal
+              Formal
+            </SelectItem>
+            <SelectItem value="neutral">
+              Neutral
             </SelectItem>
             <SelectItem value="casual">
-              casual
+              Casual
+            </SelectItem>
+            <SelectItem value="polite">
+              Polite
+            </SelectItem>
+            <SelectItem value="business">
+              Business
+            </SelectItem>
+            <SelectItem value="academic">
+              Academic
             </SelectItem>
           </SelectContent>
         </Select>
@@ -626,7 +692,39 @@ watch([
           <Switch v-model:checked="translatePreserveNamedEntities" />
         </div>
 
+        <div class="flex items-center justify-between">
+          <Label>保留格式（换行/标题/列表/Markdown/HTML）</Label>
+          <Switch v-model:checked="translatePreserveFormatting" />
+        </div>
+        <div class="flex items-center justify-between">
+          <Label>保持数字与货币格式</Label>
+          <Switch v-model:checked="translatePreserveNumbersUnits" />
+        </div>
+        <div class="flex items-center justify-between">
+          <Label>自动进行单位转换（公制/英制）</Label>
+          <Switch v-model:checked="translateAutoConvertUnits" />
+        </div>
+
+        <Label class="mb-1">本地化模式</Label>
+        <Select v-model="translateLocalizationMode">
+          <SelectTrigger class="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Off">
+              Off
+            </SelectItem>
+            <SelectItem value="Mild">
+              Mild
+            </SelectItem>
+            <SelectItem value="Strong">
+              Strong
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
         <Label class="mb-1">术语表（JSON）</Label>
+        <input type="file" accept=".json,application/json" class="w-full text-sm" @change="onGlossaryUpload">
         <Textarea v-model="translateTerminology" rows="3" />
       </div>
 
