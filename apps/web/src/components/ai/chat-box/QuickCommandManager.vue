@@ -43,6 +43,11 @@ watch(() => featureType.value.value, (newType) => {
 const label = ref(``)
 const template = ref(``)
 
+function genId(prefix: string) {
+  const id = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
+  return `${prefix}${id}`
+}
+
 function addCmd() {
   if (!label.value.trim() || !template.value.trim())
     return
@@ -55,8 +60,6 @@ function addCmd() {
   label.value = ``
   template.value = ``
 }
-
-/* moved below reactive declarations to satisfy no-use-before-define */
 
 /* ---------- 共享设置（与菜单一致的键名） ---------- */
 const styleId = kvStore.reactive<string>('ai_style_id', 'style:business')
@@ -501,7 +504,7 @@ async function onGlossaryUpload(e: Event) {
           <Input v-model="label" placeholder="指令名称 (如：补充案例)" />
           <Textarea v-model="template" rows="2" placeholder="模板，可用 {{sel}} 占位" />
           <div class="flex justify-end">
-            <Button variant="secondary" size="xs" @click="() => { if (label && template) { qcStore.add(label, template, `expand-mode:${crypto.randomUUID()}`); label = ''; template = ''; } }">
+            <Button variant="secondary" size="xs" @click="() => { if (label && template) { qcStore.add(label, template, genId('expand-mode:')); label = ''; template = ''; } }">
               添加新提示词
             </Button>
           </div>
@@ -543,8 +546,8 @@ async function onGlossaryUpload(e: Event) {
                       const checked = e.target.checked
                       if (checked && !selectedConnectIds.includes(cmd.id)) selectedConnectIds.push(cmd.id)
                       else if (!checked) selectedConnectIds = selectedConnectIds.filter(k => k !== cmd.id)
-                      try { connectTermsStr.value = JSON.stringify(Array.from(new Set(selectedConnectIds))) }
-                      catch { connectTermsStr.value = '[]' }
+                      try { connectTermsStr = JSON.stringify(Array.from(new Set(selectedConnectIds))) }
+                      catch { connectTermsStr = '[]' }
                     }"
                   >
                   <label :for="`connect-id-${cmd.id}`" class="text-sm">
@@ -557,8 +560,10 @@ async function onGlossaryUpload(e: Event) {
                   </Button>
                   <Button
                     variant="outline" size="xs" @click="() => {
-                      qcStore.remove(cmd.id); selectedConnectIds = selectedConnectIds.filter(k => k !== cmd.id); try { connectTermsStr.value = JSON.stringify(Array.from(new Set(selectedConnectIds))) }
-                      catch { connectTermsStr.value = '[]' }
+                      qcStore.remove(cmd.id);
+                      selectedConnectIds = selectedConnectIds.filter(k => k !== cmd.id);
+                      try { connectTermsStr = JSON.stringify(Array.from(new Set(selectedConnectIds))) }
+                      catch { connectTermsStr = '[]' }
                     }"
                   >
                     删除
@@ -574,7 +579,7 @@ async function onGlossaryUpload(e: Event) {
           <Input v-model="label" placeholder="指令名称 (如：逻辑衔接)" />
           <Textarea v-model="template" rows="2" placeholder="模板，可用 {{sel}} 占位" />
           <div class="flex justify-end">
-            <Button variant="secondary" size="xs" @click="() => { if (label && template) { qcStore.add(label, template, `connect-mode:${crypto.randomUUID()}`); label = ''; template = ''; } }">
+            <Button variant="secondary" size="xs" @click="() => { if (label && template) { qcStore.add(label, template, genId('connect-mode:')); label = ''; template = ''; } }">
               添加新提示词
             </Button>
           </div>

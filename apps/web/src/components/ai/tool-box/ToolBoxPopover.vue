@@ -942,8 +942,8 @@ function fixLeadingBullet(text: string): string {
                       const checked = e.target.checked
                       if (checked && !selectedConnectIds.includes(cmd.id)) selectedConnectIds.push(cmd.id)
                       else if (!checked) selectedConnectIds = selectedConnectIds.filter(k => k !== cmd.id)
-                      try { connectTermsStr.value = JSON.stringify(Array.from(new Set(selectedConnectIds))) }
-                      catch { connectTermsStr.value = '[]' }
+                      try { connectTermsStr = JSON.stringify(Array.from(new Set(selectedConnectIds))) }
+                      catch { connectTermsStr = '[]' }
                     }"
                   >
                   <label :for="`connect-id-${cmd.id}`" class="text-sm">
