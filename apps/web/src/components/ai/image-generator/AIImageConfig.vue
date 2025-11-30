@@ -12,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import useAIImageConfigStore from '@/stores/aiImageConfig'
 
 /* -------------------------- 基础数据 -------------------------- */
@@ -19,7 +21,7 @@ import useAIImageConfigStore from '@/stores/aiImageConfig'
 const emit = defineEmits([`saved`])
 
 const AIImageConfigStore = useAIImageConfigStore()
-const { type, endpoint, model, apiKey, size, quality, style } = storeToRefs(AIImageConfigStore)
+const { type, endpoint, model, apiKey, size, quality, style, stylePreset, resolution, composition, mood, color_tone, lighting, detail_level, negative_prompt, num_images, seed, prompt_enhancement, safety_level, allow_style_reference, character_consistency, custom_instruction } = storeToRefs(AIImageConfigStore)
 
 /** UI 状态 */
 const loading = ref(false)
@@ -217,6 +219,326 @@ const styleOptions = [
         class="w-full mt-1 p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
         placeholder="输入模型名称，如：dall-e-3"
       >
+    </div>
+
+    <!-- 核心设置 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <Label class="mb-1 block text-sm font-medium">画面风格</Label>
+        <Select v-model="stylePreset">
+          <SelectTrigger class="w-full">
+            <SelectValue>
+              {{ stylePreset || '请选择风格或自由输入' }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="realistic photo">
+              写实摄影
+            </SelectItem>
+            <SelectItem value="anime">
+              二次元 / 动漫风
+            </SelectItem>
+            <SelectItem value="cyberpunk">
+              赛博朋克
+            </SelectItem>
+            <SelectItem value="watercolor">
+              水彩
+            </SelectItem>
+            <SelectItem value="oil painting">
+              油画
+            </SelectItem>
+            <SelectItem value="sketch">
+              素描
+            </SelectItem>
+            <SelectItem value="3D render">
+              3D 渲染
+            </SelectItem>
+            <SelectItem value="pixel art">
+              像素风
+            </SelectItem>
+            <SelectItem value="Chinese ink style">
+              国潮 / 国画
+            </SelectItem>
+            <SelectItem value="retro HK">
+              复古港风
+            </SelectItem>
+            <SelectItem value="flat illustration">
+              手绘 / 扁平插画
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">画面尺寸</Label>
+        <Select v-model="resolution">
+          <SelectTrigger class="w-full">
+            <SelectValue>
+              {{ resolution }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1:1">
+              1:1（方图）
+            </SelectItem>
+            <SelectItem value="3:4">
+              3:4
+            </SelectItem>
+            <SelectItem value="4:3">
+              4:3
+            </SelectItem>
+            <SelectItem value="9:16">
+              9:16（竖图）
+            </SelectItem>
+            <SelectItem value="16:9">
+              16:9（横图）
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">主体与构图</Label>
+        <Select v-model="composition">
+          <SelectTrigger class="w-full">
+            <SelectValue>
+              {{ composition || '请选择' }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="close-up">
+              特写
+            </SelectItem>
+            <SelectItem value="portrait">
+              近景 / 半身
+            </SelectItem>
+            <SelectItem value="full-body">
+              全身
+            </SelectItem>
+            <SelectItem value="center composition">
+              居中构图
+            </SelectItem>
+            <SelectItem value="rule of thirds">
+              三分法
+            </SelectItem>
+            <SelectItem value="symmetry">
+              对称
+            </SelectItem>
+            <SelectItem value="single subject">
+              单主体
+            </SelectItem>
+            <SelectItem value="multiple subjects">
+              多主体
+            </SelectItem>
+            <SelectItem value="simple background">
+              背景简洁
+            </SelectItem>
+            <SelectItem value="medium background">
+              背景适中
+            </SelectItem>
+            <SelectItem value="rich background">
+              背景丰富
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">氛围与情绪</Label>
+        <Select v-model="mood">
+          <SelectTrigger class="w-full">
+            <SelectValue>
+              {{ mood || '请选择' }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="warm and cute">
+              温暖、可爱、治愈
+            </SelectItem>
+            <SelectItem value="cool and lonely">
+              冷色、孤独、未来感
+            </SelectItem>
+            <SelectItem value="epic and dark">
+              酷炫、黑暗、史诗感
+            </SelectItem>
+            <SelectItem value="childlike and dreamy">
+              童趣、梦幻、元气
+            </SelectItem>
+            <SelectItem value="horror and eerie">
+              恐怖、诡异
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">色调</Label>
+        <Select v-model="color_tone">
+          <SelectTrigger class="w-full">
+            <SelectValue>
+              {{ color_tone || '请选择' }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="warm">
+              暖色调
+            </SelectItem>
+            <SelectItem value="cool">
+              冷色调
+            </SelectItem>
+            <SelectItem value="black and white">
+              黑白
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">光影</Label>
+        <Select v-model="lighting">
+          <SelectTrigger class="w-full">
+            <SelectValue>
+              {{ lighting || '请选择' }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="bright">
+              明亮
+            </SelectItem>
+            <SelectItem value="dim">
+              阴暗
+            </SelectItem>
+            <SelectItem value="cinematic">
+              电影光
+            </SelectItem>
+            <SelectItem value="soft light">
+              柔光
+            </SelectItem>
+            <SelectItem value="hard light">
+              硬光
+            </SelectItem>
+            <SelectItem value="backlight">
+              逆光
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">细节等级</Label>
+        <Select v-model="detail_level">
+          <SelectTrigger class="w-full">
+            <SelectValue>
+              {{ detail_level }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="草图">
+              草图
+            </SelectItem>
+            <SelectItem value="简单">
+              简单
+            </SelectItem>
+            <SelectItem value="适中">
+              适中
+            </SelectItem>
+            <SelectItem value="高精细">
+              高精细
+            </SelectItem>
+            <SelectItem value="超级写实">
+              超级写实
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">生成数量</Label>
+        <input
+          v-model.number="num_images"
+          type="number"
+          min="1"
+          max="8"
+          class="w-full mt-1 p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+        >
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">随机种子</Label>
+        <input
+          v-model="seed"
+          type="text"
+          placeholder="random 或指定数字"
+          class="w-full mt-1 p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+        >
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">提示词增强</Label>
+        <Select v-model="prompt_enhancement">
+          <SelectTrigger class="w-full">
+            <SelectValue>
+              {{ prompt_enhancement }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="off">
+              Off
+            </SelectItem>
+            <SelectItem value="mild">
+              Mild
+            </SelectItem>
+            <SelectItem value="strong">
+              Strong
+            </SelectItem>
+            <SelectItem value="expert">
+              Expert
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label class="mb-1 block text-sm font-medium">安全过滤等级</Label>
+        <Select v-model="safety_level">
+          <SelectTrigger class="w-full">
+            <SelectValue>
+              {{ safety_level }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="strict">
+              严格
+            </SelectItem>
+            <SelectItem value="standard">
+              标准
+            </SelectItem>
+            <SelectItem value="custom">
+              自定义
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <Label class="text-sm font-medium">允许风格参考图</Label>
+        <Switch v-model:checked="allow_style_reference" />
+      </div>
+
+      <div class="flex items-center justify-between">
+        <Label class="text-sm font-medium">人物一致性</Label>
+        <Switch v-model:checked="character_consistency" />
+      </div>
+    </div>
+
+    <div>
+      <Label class="mb-1 block text-sm font-medium">避免内容</Label>
+      <Textarea v-model="negative_prompt" rows="2" class="w-full" placeholder="例如：不要多余手指、不要文字" />
+    </div>
+
+    <div>
+      <Label class="mb-1 block text-sm font-medium">自定义补充说明</Label>
+      <Textarea v-model="custom_instruction" rows="2" class="w-full" placeholder="用于进一步控制风格或专业术语" />
     </div>
 
     <!-- 图像尺寸 -->

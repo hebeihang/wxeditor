@@ -3,6 +3,7 @@ import { serviceOptions } from '@md/shared/configs'
 import { Check } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import useAIConfigStore from '@/stores/aiConfig'
+import useOutlineSettings from '@/stores/outlineSettings'
 import { useQuickCommands } from '@/stores/quickCommands'
 import { store as kvStore } from '@/utils/storage'
 
@@ -109,11 +110,17 @@ const translatePreserveNumbersUnits = kvStore.reactive<boolean>('ai_translate_nu
 const translateAutoConvertUnits = kvStore.reactive<boolean>('ai_translate_units_convert', false)
 const translateLocalizationMode = kvStore.reactive<string>('ai_translate_localization_mode', 'Off')
 
-const summarizeStyleId = kvStore.reactive<string>('ai_summarize_style_id', '')
-const summarizeCompressionMode = kvStore.reactive<string>('ai_summarize_mode', '百分比')
-const summarizeCompressionValue = kvStore.reactive<number>('ai_summarize_val', 30)
-const summarizePreserveKeyPoints = kvStore.reactive<boolean>('ai_summarize_keep_key', true)
-const summarizeExplainOmissions = kvStore.reactive<boolean>('ai_summarize_explain', false)
+const summaryType = kvStore.reactive<string>('ai_summary_type', '精简摘要')
+const summaryLength = kvStore.reactive<string>('ai_summary_length', '50-100字')
+const summaryLengthCustom = kvStore.reactive<number>('ai_summary_length_custom', 100)
+const preserveKeyInfo = kvStore.reactive<boolean>('ai_summary_preserve_key_info', true)
+const compressionRatio = kvStore.reactive<string>('ai_summary_compression_ratio', '30%')
+const keepOriginalOpinions = kvStore.reactive<string>('ai_summary_keep_original_opinions', '可适度重述')
+const structureFollowing = kvStore.reactive<string>('ai_summary_structure_following', 'mild')
+const toneStyle = kvStore.reactive<string>('ai_summary_tone_style', '中性学术')
+const allowTitle = kvStore.reactive<boolean>('ai_summary_allow_title', false)
+const allowQuotes = kvStore.reactive<boolean>('ai_summary_allow_quotes', false)
+const customInstruction = kvStore.reactive<string>('ai_summary_custom_instruction', '')
 
 const grammarAutoFix = kvStore.reactive<string>('ai_grammar_autofix', '建议并标注')
 const grammarShowInlineAnnotations = kvStore.reactive<boolean>('ai_grammar_inline', true)
@@ -126,10 +133,21 @@ const continueMode = kvStore.reactive<string>('ai_continue_mode', '字数限制'
 const wordsOrParagraphs = kvStore.reactive<number>('ai_continue_target', 200)
 const snapToExistingContext = kvStore.reactive<boolean>('ai_continue_snap', true)
 
-const outlineStyleId = kvStore.reactive<string>('ai_outline_style_id', '')
-const outlineLevels = kvStore.reactive<number>('ai_outline_levels', 2)
-const outlineTargetSections = kvStore.reactive<number>('ai_outline_sections', 5)
-const includeParagraphSamples = kvStore.reactive<boolean>('ai_outline_samples', true)
+const continueGoal = kvStore.reactive<string>('ai_continue_goal', '补全文本')
+const continueLength = kvStore.reactive<string>('ai_continue_length', '短（50–100 字）')
+const continueLengthCustom = kvStore.reactive<number>('ai_continue_length_custom', 150)
+const continueWritingStyle = kvStore.reactive<string>('ai_continue_writing_style', '与原文一致')
+const continueTone = kvStore.reactive<string>('ai_continue_tone', '中性')
+const continuePreserveOriginalInfo = kvStore.reactive<string>('ai_continue_preserve_original_info', 'strong')
+const continueStoryDirection = kvStore.reactive<string>('ai_continue_story_direction', '按现有逻辑推进')
+const continueConsistencyMode = kvStore.reactive<string>('ai_continue_consistency_mode', '部分模仿')
+const continueForbiddenElements = kvStore.reactive<string>('ai_continue_forbidden_elements', '')
+const continueStructureControl = kvStore.reactive<string>('ai_continue_structure_control', '加强过渡')
+const continueCreativityLevel = kvStore.reactive<number>('ai_continue_creativity_level', 50)
+const continueReadabilityLevel = kvStore.reactive<string>('ai_continue_readability_level', '大众读者')
+const continueCustomInstruction = kvStore.reactive<string>('ai_continue_custom_instruction', '')
+
+const outlineSettings = useOutlineSettings()
 
 /* ---------- 编辑 ---------- */
 const editingId = ref<string | null>(null)
@@ -175,11 +193,17 @@ watch([
   translatePreserveNumbersUnits,
   translateAutoConvertUnits,
   translateLocalizationMode,
-  summarizeStyleId,
-  summarizeCompressionMode,
-  summarizeCompressionValue,
-  summarizePreserveKeyPoints,
-  summarizeExplainOmissions,
+  summaryType,
+  summaryLength,
+  summaryLengthCustom,
+  preserveKeyInfo,
+  compressionRatio,
+  keepOriginalOpinions,
+  structureFollowing,
+  toneStyle,
+  allowTitle,
+  allowQuotes,
+  customInstruction,
   grammarAutoFix,
   grammarShowInlineAnnotations,
   grammarLanguage,
@@ -189,10 +213,32 @@ watch([
   continueMode,
   wordsOrParagraphs,
   snapToExistingContext,
-  outlineStyleId,
-  outlineLevels,
-  outlineTargetSections,
-  includeParagraphSamples,
+  continueGoal,
+  continueLength,
+  continueLengthCustom,
+  continueWritingStyle,
+  continueTone,
+  continuePreserveOriginalInfo,
+  continueStoryDirection,
+  continueConsistencyMode,
+  continueForbiddenElements,
+  continueStructureControl,
+  continueCreativityLevel,
+  continueReadabilityLevel,
+  continueCustomInstruction,
+  outlineSettings.outline_granularity,
+  outlineSettings.outline_depth,
+  outlineSettings.outline_type,
+  outlineSettings.preserve_order,
+  outlineSettings.compression_level,
+  outlineSettings.preserve_terms,
+  outlineSettings.outline_style,
+  outlineSettings.output_format,
+  outlineSettings.analysis_focus,
+  outlineSettings.merge_similar_points,
+  outlineSettings.infer_implied_points,
+  outlineSettings.allow_expansion,
+  outlineSettings.custom_instruction,
 ], () => {})
 
 async function onGlossaryUpload(e: Event) {
@@ -734,47 +780,186 @@ async function onGlossaryUpload(e: Event) {
       </div>
 
       <div v-if="mode === 'summarize'" class="space-y-3 mt-4 border rounded-md p-3">
-        <Label class="mb-1">输出文风</Label>
-        <Select v-model="summarizeStyleId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
-                {{ opt.label }}
+        <div>
+          <Label class="mb-1">摘要类型</Label>
+          <Select v-model="summaryType">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="精简摘要">
+                精简摘要
               </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+              <SelectItem value="重点摘要">
+                重点摘要
+              </SelectItem>
+              <SelectItem value="要点列表">
+                要点列表
+              </SelectItem>
+              <SelectItem value="大纲式摘要">
+                大纲式摘要
+              </SelectItem>
+              <SelectItem value="新闻式导语">
+                新闻式导语
+              </SelectItem>
+              <SelectItem value="结构化摘要">
+                结构化摘要
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Label class="mb-1">压缩模式</Label>
-        <Select v-model="summarizeCompressionMode">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="百分比">
-              百分比
-            </SelectItem>
-            <SelectItem value="目标字数">
-              目标字数
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">百分比或目标字数</Label>
-        <NumberField v-model="summarizeCompressionValue" :min="5" :max="100" :step="5">
-          <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
-        </NumberField>
+        <div>
+          <Label class="mb-1">摘要长度</Label>
+          <Select v-model="summaryLength">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="20-50字">
+                极短（20–50字）
+              </SelectItem>
+              <SelectItem value="50-100字">
+                短（50–100字）
+              </SelectItem>
+              <SelectItem value="100-200字">
+                中等（100–200字）
+              </SelectItem>
+              <SelectItem value="200-400字">
+                长（200–400字）
+              </SelectItem>
+              <SelectItem value="自定义">
+                自定义字数
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <div v-if="summaryLength === '自定义'" class="mt-2">
+            <Label class="mb-1">自定义字数</Label>
+            <NumberField v-model="summaryLengthCustom" :min="20" :max="1000" :step="10">
+              <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
+            </NumberField>
+          </div>
+        </div>
 
         <div class="flex items-center justify-between">
-          <Label>优先保留关键要点</Label>
-          <Switch v-model:checked="summarizePreserveKeyPoints" />
+          <Label>保留关键信息（人名/机构/数字/结论）</Label>
+          <Switch v-model:checked="preserveKeyInfo" />
+        </div>
+
+        <div>
+          <Label class="mb-1">内容压缩比例</Label>
+          <Select v-model="compressionRatio">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10%">
+                10%
+              </SelectItem>
+              <SelectItem value="20%">
+                20%
+              </SelectItem>
+              <SelectItem value="30%">
+                30%
+              </SelectItem>
+              <SelectItem value="50%">
+                50%
+              </SelectItem>
+              <SelectItem value="auto">
+                自动
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label class="mb-1">观点保留</Label>
+          <Select v-model="keepOriginalOpinions">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="保持原样">
+                摘要应保持作者观点原样
+              </SelectItem>
+              <SelectItem value="可适度重述">
+                可适度重述
+              </SelectItem>
+              <SelectItem value="可重构逻辑但保留结论">
+                可完全重构逻辑但保持结论一致
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label class="mb-1">结构遵循度</Label>
+          <Select v-model="structureFollowing">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="strict">
+                严格遵循
+              </SelectItem>
+              <SelectItem value="mild">
+                适度调整
+              </SelectItem>
+              <SelectItem value="reorganize">
+                重新组织
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label class="mb-1">摘要语气与风格</Label>
+          <Select v-model="toneStyle">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="新闻客观">
+                新闻客观
+              </SelectItem>
+              <SelectItem value="中性学术">
+                中性学术
+              </SelectItem>
+              <SelectItem value="简明科普">
+                简明科普
+              </SelectItem>
+              <SelectItem value="商务正式">
+                商务正式
+              </SelectItem>
+              <SelectItem value="轻松口语化">
+                轻松口语化
+              </SelectItem>
+              <SelectItem value="面向儿童">
+                面向儿童
+              </SelectItem>
+              <SelectItem value="面向初学者">
+                面向初学者
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <Label>允许加入标题</Label>
+          <Switch v-model:checked="allowTitle" />
         </div>
         <div class="flex items-center justify-between">
-          <Label>说明被省略的重要信息</Label>
-          <Switch v-model:checked="summarizeExplainOmissions" />
+          <Label>允许引用原文关键句</Label>
+          <Switch v-model:checked="allowQuotes" />
+        </div>
+
+        <div class="sm:col-span-2">
+          <Label class="mb-1">自定义指令</Label>
+          <Textarea v-model="customInstruction" rows="2" placeholder="如：必须列成三点、禁止使用形容词、按场景分段提炼等" />
+        </div>
+
+        <div class="text-xs text-muted-foreground">
+          字数优先于压缩比例；如启用保留关键信息，则人名、机构名、数字与结论不得改写；允许引用时，引用不超过摘要内容的30%；默认输出为 Markdown 格式。
         </div>
       </div>
 
@@ -831,92 +1016,498 @@ async function onGlossaryUpload(e: Event) {
       </div>
 
       <div v-if="mode === 'continue'" class="space-y-3 mt-4 border rounded-md p-3">
-        <Label class="mb-1">延续文风</Label>
-        <Select v-model="continueStyleId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
-                {{ opt.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label class="mb-1">续写目的</Label>
+            <Select v-model="continueGoal">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="补全文本">
+                  补全文本
+                </SelectItem>
+                <SelectItem value="延续叙事">
+                  延续叙事
+                </SelectItem>
+                <SelectItem value="扩展观点">
+                  扩展观点
+                </SelectItem>
+                <SelectItem value="深化细节">
+                  深化细节
+                </SelectItem>
+                <SelectItem value="填补逻辑空白">
+                  填补逻辑空白
+                </SelectItem>
+                <SelectItem value="创意剧情发展">
+                  创意剧情发展
+                </SelectItem>
+                <SelectItem value="完成段落/章节">
+                  完成段落/章节
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Label class="mb-1">情感（可选）</Label>
-        <Select v-model="continueToneId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">
-              无
-            </SelectItem>
-            <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('tone:'))" :key="opt.id" :value="opt.id">
-              {{ opt.label }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+          <div>
+            <Label class="mb-1">续写长度</Label>
+            <Select v-model="continueLength">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="极短（1–2 句）">
+                  极短（1–2 句）
+                </SelectItem>
+                <SelectItem value="短（50–100 字）">
+                  短（50–100 字）
+                </SelectItem>
+                <SelectItem value="中长（100–300 字）">
+                  中长（100–300 字）
+                </SelectItem>
+                <SelectItem value="长（300–800 字）">
+                  长（300–800 字）
+                </SelectItem>
+                <SelectItem value="自定义字数">
+                  自定义字数
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <div v-if="continueLength === '自定义字数'" class="mt-2">
+              <Label class="mb-1">自定义字数</Label>
+              <NumberField v-model="continueLengthCustom" :min="20" :max="2000" :step="10">
+                <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
+              </NumberField>
+            </div>
+          </div>
 
-        <Label class="mb-1">续写模式</Label>
-        <Select v-model="continueMode">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="字数限制">
-              字数限制
-            </SelectItem>
-            <SelectItem value="段落数量">
-              段落数量
-            </SelectItem>
-            <SelectItem value="情节推进">
-              情节推进
-            </SelectItem>
-          </SelectContent>
-        </Select>
+          <div>
+            <Label class="mb-1">续写风格</Label>
+            <Select v-model="continueWritingStyle">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="与原文一致">
+                  与原文一致（默认）
+                </SelectItem>
+                <SelectItem value="幽默">
+                  幽默
+                </SelectItem>
+                <SelectItem value="严肃">
+                  严肃
+                </SelectItem>
+                <SelectItem value="温柔">
+                  温柔
+                </SelectItem>
+                <SelectItem value="说服力强">
+                  说服力强
+                </SelectItem>
+                <SelectItem value="小说风">
+                  小说风
+                </SelectItem>
+                <SelectItem value="商务风">
+                  商务风
+                </SelectItem>
+                <SelectItem value="学术风">
+                  学术风
+                </SelectItem>
+                <SelectItem value="公众号风">
+                  公众号风
+                </SelectItem>
+                <SelectItem value="影视解说风">
+                  影视解说风
+                </SelectItem>
+                <SelectItem value="剧情旁白风">
+                  剧情旁白风
+                </SelectItem>
+                <SelectItem value="故事化叙述">
+                  故事化叙述
+                </SelectItem>
+                <SelectItem value="自定义">
+                  自定义
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <Textarea v-if="continueWritingStyle === '自定义'" v-model="continueWritingStyle" rows="2" class="mt-2" placeholder="如：模仿《三体》的克制科幻风" />
+          </div>
 
-        <Label class="mb-1">目标（字数或段落）</Label>
-        <NumberField v-model="wordsOrParagraphs" :min="20" :max="5000" :step="20">
-          <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
-        </NumberField>
+          <div>
+            <Label class="mb-1">语气</Label>
+            <Select v-model="continueTone">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="中性">
+                  中性
+                </SelectItem>
+                <SelectItem value="愤怒">
+                  愤怒
+                </SelectItem>
+                <SelectItem value="欢快">
+                  欢快
+                </SelectItem>
+                <SelectItem value="悲伤">
+                  悲伤
+                </SelectItem>
+                <SelectItem value="激昂">
+                  激昂
+                </SelectItem>
+                <SelectItem value="冷静理性">
+                  冷静理性
+                </SelectItem>
+                <SelectItem value="轻松口语化">
+                  轻松口语化
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div class="flex items-center justify-between">
-          <Label>严格衔接现有上下文</Label>
-          <Switch v-model:checked="snapToExistingContext" />
+          <div>
+            <Label class="mb-1">保留原文信息</Label>
+            <Select v-model="continuePreserveOriginalInfo">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="strong">
+                  强（不得违背原文）
+                </SelectItem>
+                <SelectItem value="medium">
+                  中（允许小幅突破）
+                </SelectItem>
+                <SelectItem value="weak">
+                  弱（可自由创作）
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label class="mb-1">剧情推进方向</Label>
+            <Select v-model="continueStoryDirection">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="按现有逻辑推进">
+                  按现有逻辑推进
+                </SelectItem>
+                <SelectItem value="引入新冲突">
+                  引入新冲突
+                </SelectItem>
+                <SelectItem value="反转剧情">
+                  反转剧情
+                </SelectItem>
+                <SelectItem value="情绪爆发">
+                  情绪爆发
+                </SelectItem>
+                <SelectItem value="解释前文悬念">
+                  解释前文悬念
+                </SelectItem>
+                <SelectItem value="增强世界观设定">
+                  增强世界观设定
+                </SelectItem>
+                <SelectItem value="加深人物关系">
+                  加深人物关系
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label class="mb-1">内容一致性</Label>
+            <Select v-model="continueConsistencyMode">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="完全模仿">
+                  完全模仿
+                </SelectItem>
+                <SelectItem value="部分模仿">
+                  部分模仿
+                </SelectItem>
+                <SelectItem value="自由表达">
+                  自由表达
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label class="mb-1">禁止项（逗号分隔）</Label>
+            <Textarea v-model="continueForbiddenElements" rows="2" placeholder="如：不要新的角色，不要网络用语，不要总结" />
+          </div>
+
+          <div>
+            <Label class="mb-1">逻辑结构控制</Label>
+            <Select v-model="continueStructureControl">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="紧跟上一句">
+                  紧跟上一句
+                </SelectItem>
+                <SelectItem value="扩展上一段内容">
+                  扩展上一段内容
+                </SelectItem>
+                <SelectItem value="增加细节">
+                  增加细节
+                </SelectItem>
+                <SelectItem value="加强过渡">
+                  加强过渡
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label class="mb-1">创意自由度（0–100）</Label>
+            <NumberField v-model="continueCreativityLevel" :min="0" :max="100" :step="5">
+              <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
+            </NumberField>
+          </div>
+
+          <div>
+            <Label class="mb-1">阅读难度</Label>
+            <Select v-model="continueReadabilityLevel">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="小学">
+                  小学
+                </SelectItem>
+                <SelectItem value="初中">
+                  初中
+                </SelectItem>
+                <SelectItem value="高中">
+                  高中
+                </SelectItem>
+                <SelectItem value="大众读者">
+                  大众读者
+                </SelectItem>
+                <SelectItem value="专业读者">
+                  专业读者
+                </SelectItem>
+                <SelectItem value="学术级">
+                  学术级
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div class="sm:col-span-2">
+            <Label class="mb-1">自定义指令（最高优先）</Label>
+            <Textarea v-model="continueCustomInstruction" rows="3" placeholder="如：必须保持第一人称、继续以对话形式写、增加场景描写、不要出现时间跳跃" />
+          </div>
         </div>
       </div>
 
       <div v-if="mode === 'outline'" class="space-y-3 mt-4 border rounded-md p-3">
-        <Label class="mb-1">目标文风</Label>
-        <Select v-model="outlineStyleId">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="opt in qcStore.commands.filter(c => c.id.startsWith('style:'))" :key="opt.id" :value="opt.id">
-                {{ opt.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">大纲深度</Label>
-        <NumberField v-model="outlineLevels" :min="1" :max="4" :step="1">
-          <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
-        </NumberField>
-
-        <Label class="mb-1">目标章节数</Label>
-        <NumberField v-model="outlineTargetSections" :min="1" :max="20" :step="1">
-          <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
-        </NumberField>
-
-        <div class="flex items-center justify-between">
-          <Label>为要点生成示例段落（简短）</Label>
-          <Switch v-model:checked="includeParagraphSamples" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label class="mb-1">大纲粒度</Label>
+            <Select v-model="outlineSettings.outline_granularity.value">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="粗略">
+                  粗略（三大点结构）
+                </SelectItem>
+                <SelectItem value="中等">
+                  中等（3–6 个要点）
+                </SelectItem>
+                <SelectItem value="精细">
+                  精细（6–12 个要点）
+                </SelectItem>
+                <SelectItem value="超细">
+                  超细（每句话一个要点）
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label class="mb-1">大纲层级</Label>
+            <Select v-model="outlineSettings.outline_depth.value">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="单层">
+                  单层
+                </SelectItem>
+                <SelectItem value="两层">
+                  两层（大点+小点）
+                </SelectItem>
+                <SelectItem value="三层">
+                  三层（大点+小点+例证）
+                </SelectItem>
+                <SelectItem value="自动按内容判断">
+                  自动按内容判断
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="sm:col-span-2">
+            <Label class="mb-1">大纲类型</Label>
+            <Select v-model="outlineSettings.outline_type.value">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="逻辑结构">
+                  逻辑结构（总—分 / 并列 / 对比）
+                </SelectItem>
+                <SelectItem value="论证结构">
+                  论证结构（观点—论据—例子）
+                </SelectItem>
+                <SelectItem value="叙事结构">
+                  叙事结构（时间线 / 冲突推进 / 事件拆分）
+                </SelectItem>
+                <SelectItem value="产品文案框架">
+                  产品文案框架（痛点—方案—亮点）
+                </SelectItem>
+                <SelectItem value="学术论文框架">
+                  学术论文框架（研究对象—方法—结论）
+                </SelectItem>
+                <SelectItem value="公众号框架">
+                  公众号框架（开头抓点—核心观点—案例—总结）
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex items-center justify-between sm:col-span-2">
+            <Label>是否保留原文顺序</Label>
+            <Switch v-model:checked="outlineSettings.preserve_order.value" />
+          </div>
+          <div>
+            <Label class="mb-1">总结 vs 提炼程度</Label>
+            <Select v-model="outlineSettings.compression_level.value">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="逐句拆解">
+                  逐句拆解
+                </SelectItem>
+                <SelectItem value="稍作总结">
+                  稍作总结
+                </SelectItem>
+                <SelectItem value="适度压缩">
+                  适度压缩
+                </SelectItem>
+                <SelectItem value="大幅抽象">
+                  大幅抽象
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex items-center justify-between">
+            <Label>保留原文关键术语</Label>
+            <Switch v-model:checked="outlineSettings.preserve_terms.value" />
+          </div>
+          <div>
+            <Label class="mb-1">风格</Label>
+            <Select v-model="outlineSettings.outline_style.value">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="直述">
+                  直述
+                </SelectItem>
+                <SelectItem value="简洁短句">
+                  简洁短句
+                </SelectItem>
+                <SelectItem value="关键词式">
+                  关键词式
+                </SelectItem>
+                <SelectItem value="解释式">
+                  解释式
+                </SelectItem>
+                <SelectItem value="行动项格式">
+                  行动项格式
+                </SelectItem>
+                <SelectItem value="问题—对策">
+                  问题—对策
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label class="mb-1">输出格式</Label>
+            <Select v-model="outlineSettings.output_format.value">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="markdown">
+                  Markdown
+                </SelectItem>
+                <SelectItem value="list">
+                  列表（1. 2. 3.）
+                </SelectItem>
+                <SelectItem value="mindmap">
+                  思维导图结构
+                </SelectItem>
+                <SelectItem value="json">
+                  JSON
+                </SelectItem>
+                <SelectItem value="outline-plus-summary">
+                  大纲+简短摘要
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label class="mb-1">分析重点</Label>
+            <Select v-model="outlineSettings.analysis_focus.value">
+              <SelectTrigger class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="提炼观点">
+                  提炼观点
+                </SelectItem>
+                <SelectItem value="提炼事实">
+                  提炼事实
+                </SelectItem>
+                <SelectItem value="提取论证链条">
+                  提取论证链条
+                </SelectItem>
+                <SelectItem value="抓情绪/冲突点">
+                  抓情绪 / 冲突点
+                </SelectItem>
+                <SelectItem value="拆结构逻辑">
+                  拆结构逻辑
+                </SelectItem>
+                <SelectItem value="抓人物动机">
+                  抓人物动机
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex items-center justify-between">
+            <Label>是否合并冗余信息</Label>
+            <Switch v-model:checked="outlineSettings.merge_similar_points.value" />
+          </div>
+          <div class="flex items-center justify-between">
+            <Label>是否识别隐含信息</Label>
+            <Switch v-model:checked="outlineSettings.infer_implied_points.value" />
+          </div>
+          <div class="flex items-center justify-between sm:col-span-2">
+            <Label>是否允许扩展</Label>
+            <Switch v-model:checked="outlineSettings.allow_expansion.value" />
+          </div>
+          <div class="sm:col-span-2">
+            <Label class="mb-1">自定义指令</Label>
+            <Textarea v-model="outlineSettings.custom_instruction.value" rows="2" placeholder="如：必须列成三点、不得加入结论、保留术语等" />
+          </div>
         </div>
       </div>
 

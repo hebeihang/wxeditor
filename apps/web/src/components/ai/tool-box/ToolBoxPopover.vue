@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select'
 import useAIConfigStore from '@/stores/aiConfig'
 import { useEditorStore } from '@/stores/editor'
+import useOutlineSettings from '@/stores/outlineSettings'
 import { useQuickCommands } from '@/stores/quickCommands'
 import { useUIStore } from '@/stores/ui'
 import { store as kvStore } from '@/utils/storage'
@@ -130,10 +131,21 @@ const continueToneId = ref<string>('none')
 const continueMode = ref<'字数限制' | '段落数量' | '情节推进'>('字数限制')
 const wordsOrParagraphs = ref<number>(200)
 const snapToExistingContext = ref<boolean>(true)
-const outlineStyleId = ref<string>('')
-const outlineLevels = ref<number>(2)
-const outlineTargetSections = ref<number>(5)
-const includeParagraphSamples = ref<boolean>(true)
+
+const contGoal = kvStore.reactive<string>('ai_continue_goal', '补全文本')
+const contLength = kvStore.reactive<string>('ai_continue_length', '短（50–100 字）')
+const contLengthCustom = kvStore.reactive<number>('ai_continue_length_custom', 150)
+const contWritingStyle = kvStore.reactive<string>('ai_continue_writing_style', '与原文一致')
+const contTone = kvStore.reactive<string>('ai_continue_tone', '中性')
+const contPreserve = kvStore.reactive<string>('ai_continue_preserve_original_info', 'strong')
+const contStory = kvStore.reactive<string>('ai_continue_story_direction', '按现有逻辑推进')
+const contConsistency = kvStore.reactive<string>('ai_continue_consistency_mode', '部分模仿')
+const contForbidden = kvStore.reactive<string>('ai_continue_forbidden_elements', '')
+const contStructure = kvStore.reactive<string>('ai_continue_structure_control', '加强过渡')
+const contCreativity = kvStore.reactive<number>('ai_continue_creativity_level', 50)
+const contReadability = kvStore.reactive<string>('ai_continue_readability_level', '大众读者')
+const contCustom = kvStore.reactive<string>('ai_continue_custom_instruction', '')
+const outlineSettings = useOutlineSettings()
 
 function deriveContinueContext(): string {
   try {
@@ -589,17 +601,33 @@ function buildActionPrompt(inputText: string): string {
       return `${base}${extra}`
     }
     case 'continue': {
-      const style = getStyleLabel(continueStyleId.value)
-      const tone = getToneLabel(continueToneId.value)
-      const strict = snapToExistingContext.value ? '严格衔接现有上下文。' : ''
-      const base = `请从当前文本结尾继续写（模式：${continueMode.value}，目标：${wordsOrParagraphs.value}），风格：${style}，情感：${tone}。优先保持语境连贯。${strict}输出 Markdown。严格的排版要求：标题应独占一行，标题后需空一行再写正文；段落之间用空行分隔；不要把标题和正文写在同一行。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}`
+      const lenText = contLength.value === '自定义字数'
+        ? `字数 ${contLengthCustom.value}`
+        : contLength.value
+      const styleText = contWritingStyle.value || '与原文一致'
+      const toneText = contTone.value || '中性'
+      const preserveText = contPreserve.value === 'strong'
+        ? '不得违背原有事实、设定、世界观与人物性格。'
+        : contPreserve.value === 'medium'
+          ? '允许小幅突破，但不得改变核心设定与关键信息。'
+          : '可自由创作，但需保持基本主题一致。'
+      const storyText = contStory.value ? `剧情推进：${contStory.value}。` : ''
+      const consistencyText = contConsistency.value ? `一致性：${contConsistency.value}。` : ''
+      const forbidText = (contForbidden.value || '').trim()
+        ? `禁止：${(contForbidden.value || '').split(/[,，;；\n]+/).map(s => s.trim()).filter(Boolean).join('、')}。`
+        : ''
+      const structureText = contStructure.value ? `结构控制：${contStructure.value}。` : ''
+      const creativityText = `创意自由度：${contCreativity.value}/100。`
+      const readText = contReadability.value ? `阅读难度：${contReadability.value}。` : ''
+      const customText = (contCustom.value || '').trim() ? `自定义指令（最高优先）：${contCustom.value.trim()}。` : ''
+      const goalText = contGoal.value ? `续写重点：${contGoal.value}。` : ''
+
+      const base = `请根据以下“续写设置”对文本进行续写。长度优先于其他控制。严格要求：续写必须自然衔接原文，不得偏题。只输出续写后的 Markdown 内容，不要任何解释或标签。\n\n设置：\n- ${goalText}\n- 长度：${lenText}\n- 风格：${styleText}\n- 语气：${toneText}\n- ${preserveText}\n- ${storyText}\n- ${consistencyText}\n- ${structureText}\n- ${creativityText}\n- ${readText}\n- ${forbidText}\n- ${customText}\n\n文本：\n${inputText}`
       return `${base}${extra}`
     }
     case 'outline': {
-      const style = getStyleLabel(outlineStyleId.value)
-      const sample = includeParagraphSamples.value ? '为每个要点生成简短示例段落。' : '无需示例段落。'
-      const base = `根据下面的思路生成一个深度为 ${outlineLevels.value} 的大纲（目标章节数：${outlineTargetSections.value}），风格：${style}。给出章节标题与每章 2-4 个要点，${sample}输出 Markdown（标题层级应使用 #）。不要使用除 <replacement>/<notes> 外的任何标签。\n\n思路：\n${inputText}`
-      return `${base}${extra}`
+      const userPrompt = outlineSettings.buildUserPrompt(inputText)
+      return `${userPrompt}${extra}`
     }
     default: {
       const fallback = `请根据最佳实践优化文本。\n\n文本：\n${inputText}`

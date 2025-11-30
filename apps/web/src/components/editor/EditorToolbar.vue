@@ -10,7 +10,7 @@ const editorStore = useEditorStore()
 const uiStore = useUIStore()
 
 const { editor } = storeToRefs(editorStore)
-const { isMobile } = storeToRefs(uiStore)
+const { isMobile, limitedAI } = storeToRefs(uiStore)
 
 const toolBoxVisible = ref(false)
 const presetAction = ref<
@@ -74,28 +74,34 @@ function openOutline() {
         <WandSparkles class="size-4 md:mr-2" />
         <span class="hidden md:inline">润色</span>
       </Button>
-      <Button variant="ghost" size="sm" :disabled="!editor" @click="openExpand">
+      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openExpand">
         <PlusCircle class="size-4 md:mr-2" />
         <span class="hidden md:inline">扩展</span>
       </Button>
-      <Button variant="ghost" size="sm" :disabled="!editor" @click="openConnect">
+      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openConnect">
         <LinkIcon class="size-4 md:mr-2" />
         <span class="hidden md:inline">衔接</span>
       </Button>
-      <Button variant="ghost" size="sm" :disabled="!editor" @click="openTranslate">
+      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openTranslate">
         <Globe class="size-4 md:mr-2" />
         <span class="hidden md:inline">翻译</span>
       </Button>
-      <Button variant="ghost" size="sm" :disabled="!editor" @click="openSummarize">
+      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openSummarize">
         <FileText class="size-4 md:mr-2" />
         <span class="hidden md:inline">摘要</span>
       </Button>
-      <Button variant="ghost" size="sm" :disabled="!editor" @click="openGrammar">
+      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openGrammar">
         <Check class="size-4 md:mr-2" />
         <span class="hidden md:inline">纠错</span>
       </Button>
 
-      <Button variant="ghost" size="sm" :disabled="!editor" @click="uiStore.toggleAIImageDialog(true)">
+      <Button
+        v-if="!limitedAI"
+        variant="ghost"
+        size="sm"
+        :disabled="!editor"
+        @click="(() => { const t = getSelectedText(); if (t) uiStore.setAIImagePrefillPrompt(t); uiStore.toggleAIImageDialog(true) })()"
+      >
         <svg class="size-4 md:mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 14h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           <path d="M6 14v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -112,11 +118,11 @@ function openOutline() {
         <span class="hidden md:inline">文生图</span>
       </Button>
 
-      <Button variant="ghost" size="sm" :disabled="!editor" @click="openContinue">
+      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openContinue">
         <PenLine class="size-4 md:mr-2" />
         <span class="hidden md:inline">续写</span>
       </Button>
-      <Button variant="ghost" size="sm" :disabled="!editor" @click="openOutline">
+      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openOutline">
         <ListTree class="size-4 md:mr-2" />
         <span class="hidden md:inline">大纲</span>
       </Button>

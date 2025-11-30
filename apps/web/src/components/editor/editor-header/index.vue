@@ -2,6 +2,7 @@
 import { Bot, ChevronDownIcon, Copy, Image as ImageIcon, Menu, Palette, Settings } from 'lucide-vue-next'
 import AIConfig from '@/components/ai/chat-box/AIConfig.vue'
 import QuickCommandManager from '@/components/ai/chat-box/QuickCommandManager.vue'
+import { AIImageConfig } from '@/components/ai/image-generator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
@@ -35,6 +36,7 @@ const cmdMgrOpen = ref(false)
 const cmdMgrMode = ref<'all' | 'title' | 'optimize' | 'expand' | 'connect' | 'translate' | 'summarize' | 'grammar' | 'continue' | 'outline'>('all')
 
 const generalAIConfigVisible = ref(false)
+const aiImageConfigVisible = ref(false)
 
 const quickCmdStore = useQuickCommands()
 const currentTitleStyle = store.reactive<string>('ai_title_style', 'title-style:news')
@@ -273,6 +275,10 @@ async function copy() {
               <ImageIcon class="mr-2 h-4 w-4" />
               打开 AI 文生图
             </MenubarItem>
+            <MenubarItem @click="aiImageConfigVisible = true">
+              <Settings class="mr-2 h-4 w-4" />
+              文生图设置…
+            </MenubarItem>
             <MenubarSub>
               <MenubarSubTrigger>
                 <span class="inline-flex items-center">
@@ -317,25 +323,25 @@ async function copy() {
             <MenubarItem @click="cmdMgrMode = 'optimize'; cmdMgrOpen = true">
               润色
             </MenubarItem>
-            <MenubarItem @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
+            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
               扩展
             </MenubarItem>
-            <MenubarItem @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
+            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
               衔接
             </MenubarItem>
-            <MenubarItem @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
+            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
               翻译
             </MenubarItem>
-            <MenubarItem @click="cmdMgrMode = 'summarize'; cmdMgrOpen = true">
+            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'summarize'; cmdMgrOpen = true">
               摘要
             </MenubarItem>
-            <MenubarItem @click="cmdMgrMode = 'grammar'; cmdMgrOpen = true">
+            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'grammar'; cmdMgrOpen = true">
               纠错
             </MenubarItem>
-            <MenubarItem @click="cmdMgrMode = 'continue'; cmdMgrOpen = true">
+            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'continue'; cmdMgrOpen = true">
               续写
             </MenubarItem>
-            <MenubarItem @click="cmdMgrMode = 'outline'; cmdMgrOpen = true">
+            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'outline'; cmdMgrOpen = true">
               大纲
             </MenubarItem>
 
@@ -374,6 +380,10 @@ async function copy() {
                 <MenubarItem @click="uiStore.toggleAIImageDialog(true)">
                   <ImageIcon class="mr-2 h-4 w-4" />
                   打开 AI 文生图
+                </MenubarItem>
+                <MenubarItem @click="aiImageConfigVisible = true">
+                  <Settings class="mr-2 h-4 w-4" />
+                  文生图设置…
                 </MenubarItem>
                 <MenubarSub>
                   <MenubarSubTrigger>
@@ -420,10 +430,10 @@ async function copy() {
                 <MenubarItem @click="cmdMgrMode = 'optimize'; cmdMgrOpen = true">
                   润色
                 </MenubarItem>
-                <MenubarItem @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
+                <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
                   扩展
                 </MenubarItem>
-                <MenubarSub>
+                <MenubarSub v-if="!uiStore.limitedAI">
                   <MenubarItem @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
                     衔接
                   </MenubarItem>
@@ -518,6 +528,14 @@ async function copy() {
         <DialogTitle>通用 AI 配置</DialogTitle>
       </DialogHeader>
       <AIConfig @saved="generalAIConfigVisible = false" />
+    </DialogContent>
+  </Dialog>
+  <Dialog v-model:open="aiImageConfigVisible">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>文生图设置</DialogTitle>
+      </DialogHeader>
+      <AIImageConfig @saved="aiImageConfigVisible = false" />
     </DialogContent>
   </Dialog>
 </template>

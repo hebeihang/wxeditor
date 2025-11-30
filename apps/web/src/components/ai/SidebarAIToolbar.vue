@@ -115,6 +115,9 @@ function openAIChat() {
 
 // 打开AI文生图
 function openAIImageGenerator() {
+  const text = getSelectedText()
+  if (text)
+    uiStore.setAIImagePrefillPrompt(text)
   toggleAIImageDialog(true)
 }
 

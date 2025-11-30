@@ -16,7 +16,7 @@ export const useUIStore = defineStore(`ui`, () => {
   const toggleEditOnLeft = useToggle(isEditOnLeft)
 
   // 是否开启 AI 工具箱
-  const showAIToolbox = store.reactive(`showAIToolbox`, true)
+  const showAIToolbox = store.reactive(`showAIToolbox`, false)
   const toggleAIToolbox = useToggle(showAIToolbox)
 
   // 是否已经显示过 AI 工具箱选中文本提示
@@ -30,6 +30,9 @@ export const useUIStore = defineStore(`ui`, () => {
 
   // 是否为移动端
   const isMobile = store.reactive(`isMobile`, false)
+
+  // 是否启用受限 AI 模式
+  const limitedAI = store.reactive(`limitedAI`, true)
 
   // 是否固定显示浮动目录
   const isPinFloatingToc = store.reactive(addPrefix(`isPinFloatingToc`), false)
@@ -67,6 +70,7 @@ export const useUIStore = defineStore(`ui`, () => {
   const aiDialogVisible = ref(false)
   const aiImageDialogVisible = ref(false)
   const aiPrefillInput = ref('')
+  const aiImagePrefillPrompt = ref('')
 
   function toggleAIDialog(value?: boolean) {
     aiDialogVisible.value = value ?? !aiDialogVisible.value
@@ -82,6 +86,14 @@ export const useUIStore = defineStore(`ui`, () => {
 
   function clearAIPrefillInput() {
     aiPrefillInput.value = ''
+  }
+
+  function setAIImagePrefillPrompt(text: string) {
+    aiImagePrefillPrompt.value = text
+  }
+
+  function clearAIImagePrefillPrompt() {
+    aiImagePrefillPrompt.value = ''
   }
 
   // 搜索面板状态
@@ -119,6 +131,7 @@ export const useUIStore = defineStore(`ui`, () => {
     isOpenRightSlider,
     isOpenPostSlider,
     isMobile,
+    limitedAI,
     isPinFloatingToc,
     isShowFloatingToc,
 
@@ -141,6 +154,9 @@ export const useUIStore = defineStore(`ui`, () => {
     aiPrefillInput,
     setAIPrefillInput,
     clearAIPrefillInput,
+    aiImagePrefillPrompt,
+    setAIImagePrefillPrompt,
+    clearAIImagePrefillPrompt,
 
     // ==================== 搜索面板 ====================
     searchTabRequest,

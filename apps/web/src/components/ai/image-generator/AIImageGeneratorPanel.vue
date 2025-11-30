@@ -34,18 +34,8 @@ const emit = defineEmits([`update:open`])
 const editorStore = useEditorStore()
 const { editor } = storeToRefs(editorStore)
 const uiStore = useUIStore()
-const { toggleAIDialog } = uiStore
-
-/* ---------- 弹窗开关 ---------- */
-const dialogVisible = ref(props.open)
-watch(() => props.open, (val) => {
-  dialogVisible.value = val
-  // 每次打开面板时检查并清理过期图片
-  if (val) {
-    cleanExpiredImages()
-  }
-})
-watch(dialogVisible, val => emit(`update:open`, val))
+const { toggleAIDialog, clearAIImagePrefillPrompt } = uiStore
+const { aiImagePrefillPrompt } = storeToRefs(uiStore)
 
 /* ---------- 状态管理 ---------- */
 const configVisible = ref(false)
@@ -59,9 +49,31 @@ const abortController = ref<AbortController | null>(null)
 const currentImageIndex = ref(0)
 const timeUpdateInterval = ref<NodeJS.Timeout | null>(null)
 
+/* ---------- 弹窗开关 ---------- */
+const dialogVisible = ref(props.open)
+watch(() => props.open, (val) => {
+  dialogVisible.value = val
+  // 每次打开面板时检查并清理过期图片
+  if (val) {
+    cleanExpiredImages()
+  }
+})
+watch(dialogVisible, val => emit(`update:open`, val))
+
+watch(aiImagePrefillPrompt, (val) => {
+  if (val && val.trim()) {
+    dialogVisible.value = true
+    prompt.value = val.trim()
+    clearAIImagePrefillPrompt()
+    if (!loading.value) {
+      generateImage()
+    }
+  }
+})
+
 /* ---------- AI 配置 ---------- */
 const AIImageConfigStore = useAIImageConfigStore()
-const { apiKey, endpoint, model, type, size, quality, style } = storeToRefs(AIImageConfigStore)
+const { apiKey, endpoint, model, type, size, quality, style, stylePreset, resolution, composition, mood, color_tone, lighting, detail_level, negative_prompt, num_images, seed, prompt_enhancement, safety_level, allow_style_reference, character_consistency, custom_instruction } = storeToRefs(AIImageConfigStore)
 
 /* ---------- 过期检查函数 ---------- */
 function isImageExpired(timestamp: number): boolean {
@@ -209,6 +221,30 @@ async function generateImage() {
 
   // 保存当前提示词用于重新生成
   const currentPrompt = prompt.value.trim()
+  const extraParts: string[] = []
+  if (stylePreset.value)
+    extraParts.push(`风格: ${stylePreset.value}`)
+  if (composition.value)
+    extraParts.push(`构图: ${composition.value}`)
+  if (mood.value)
+    extraParts.push(`氛围: ${mood.value}`)
+  if (color_tone.value)
+    extraParts.push(`色调: ${color_tone.value}`)
+  if (lighting.value)
+    extraParts.push(`光影: ${lighting.value}`)
+  if (detail_level.value)
+    extraParts.push(`细节: ${detail_level.value}`)
+  if (character_consistency.value)
+    extraParts.push(`保持角色外观一致`)
+  let effectivePrompt = currentPrompt
+  if (prompt_enhancement.value === `mild`)
+    effectivePrompt = `${effectivePrompt}. ${extraParts.join(`; `)}`
+  else if (prompt_enhancement.value === `strong`)
+    effectivePrompt = `高质量、构图优秀、噪点低、清晰度高。${effectivePrompt}. ${extraParts.join(`; `)}`
+  else if (prompt_enhancement.value === `expert`)
+    effectivePrompt = `photorealistic, professional photography/art terms applied. ${effectivePrompt}. ${extraParts.join(`; `)} ${custom_instruction.value || ``}`
+  if (negative_prompt.value)
+    effectivePrompt = `${effectivePrompt}. 避免: ${negative_prompt.value}`
   lastUsedPrompt.value = currentPrompt
 
   loading.value = true
@@ -226,15 +262,19 @@ async function generateImage() {
 
     const payload: any = {
       model: model.value,
-      prompt: currentPrompt,
+      prompt: effectivePrompt,
       size: size.value,
-      n: 1,
+      n: Math.min(Math.max(num_images.value || 1, 1), 8),
     }
 
     // 只对 DALL-E 模型添加额外参数
     if (model.value.includes(`dall-e`)) {
       payload.quality = quality.value
       payload.style = style.value
+    }
+    if (type.value === `custom` && seed.value && seed.value !== `random`) {
+      const seedVal = Number(seed.value)
+      payload.seed = Number.isNaN(seedVal) ? seed.value : seedVal
     }
 
     const res = await window.fetch(url.toString(), {
@@ -396,17 +436,46 @@ async function regenerateWithPrompt(promptText: string) {
       url.pathname = url.pathname.replace(/\/?$/, `/images/generations`)
     }
 
+    const extraParts: string[] = []
+    if (stylePreset.value)
+      extraParts.push(`风格: ${stylePreset.value}`)
+    if (composition.value)
+      extraParts.push(`构图: ${composition.value}`)
+    if (mood.value)
+      extraParts.push(`氛围: ${mood.value}`)
+    if (color_tone.value)
+      extraParts.push(`色调: ${color_tone.value}`)
+    if (lighting.value)
+      extraParts.push(`光影: ${lighting.value}`)
+    if (detail_level.value)
+      extraParts.push(`细节: ${detail_level.value}`)
+    if (character_consistency.value)
+      extraParts.push(`保持角色外观一致`)
+    let effective = promptText.trim()
+    if (prompt_enhancement.value === `mild`)
+      effective = `${effective}. ${extraParts.join(`; `)}`
+    else if (prompt_enhancement.value === `strong`)
+      effective = `高质量、构图优秀、噪点低、清晰度高。${effective}. ${extraParts.join(`; `)}`
+    else if (prompt_enhancement.value === `expert`)
+      effective = `photorealistic, professional photography/art terms applied. ${effective}. ${extraParts.join(`; `)} ${custom_instruction.value || ``}`
+    if (negative_prompt.value)
+      effective = `${effective}. 避免: ${negative_prompt.value}`
+
     const payload: any = {
       model: model.value,
-      prompt: promptText.trim(),
+      prompt: effective,
       size: size.value,
-      n: 1,
+      n: Math.min(Math.max(num_images.value || 1, 1), 8),
     }
 
     // 只对 DALL-E 模型添加额外参数
     if (model.value.includes(`dall-e`)) {
       payload.quality = quality.value
       payload.style = style.value
+    }
+    if (type.value === `custom` && seed.value && seed.value !== `random`) {
+      const seedVal = Number(seed.value)
+      payload.seed = Number.isNaN(seedVal) ? seed.value : seedVal
     }
 
     const res = await window.fetch(url.toString(), {

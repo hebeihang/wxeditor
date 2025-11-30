@@ -707,6 +707,7 @@ onUnmounted(() => {
             >
               <SearchTab v-if="codeMirrorView" ref="searchTabRef" :editor-view="codeMirrorView as any" />
               <SidebarAIToolbar
+                v-if="uiStore.showAIToolbox"
                 :is-mobile="isMobile"
                 :show-editor="showEditor"
               />
