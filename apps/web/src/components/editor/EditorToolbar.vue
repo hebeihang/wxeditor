@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, FileText, Globe, Link as LinkIcon, ListTree, PenLine, PlusCircle, WandSparkles } from 'lucide-vue-next'
+import { Check, FileText, Link as LinkIcon, ListTree, PenLine, PlusCircle, WandSparkles } from 'lucide-vue-next'
 import { AIPolishPopover } from '@/components/ai/tool-box'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -15,11 +15,10 @@ const { isMobile } = storeToRefs(uiStore)
 
 const toolBoxVisible = ref(false)
 const presetAction = ref<
-  `optimize` | `expand` | `connect` | `translate` | `summarize` | `grammar` | `continue` | `outline`
+  `optimize` | `expand` | `connect` | `summarize` | `grammar` | `continue` | `outline`
 >(`optimize`)
 const popoverRef = useTemplateRef<InstanceType<typeof AIPolishPopover>>('popoverRef')
 const aiHideConnect = kvStore.reactive<boolean>('ai_hide_connect', true)
-const aiHideTranslate = kvStore.reactive<boolean>('ai_hide_translate', true)
 const aiHideGrammar = kvStore.reactive<boolean>('ai_hide_grammar', true)
 const aiHideContinue = kvStore.reactive<boolean>('ai_hide_continue', true)
 const aiHideOutline = kvStore.reactive<boolean>('ai_hide_outline', true)
@@ -49,10 +48,6 @@ function openExpand() {
 }
 function openConnect() {
   presetAction.value = 'connect'
-  toolBoxVisible.value = true
-}
-function openTranslate() {
-  presetAction.value = 'translate'
   toolBoxVisible.value = true
 }
 function openSummarize() {
@@ -87,10 +82,6 @@ function openOutline() {
       <Button v-if="!aiHideConnect" variant="ghost" size="sm" :disabled="!editor" @click="openConnect">
         <LinkIcon class="size-4 md:mr-2" />
         <span class="hidden md:inline">衔接</span>
-      </Button>
-      <Button v-if="!aiHideTranslate" variant="ghost" size="sm" :disabled="!editor" @click="openTranslate">
-        <Globe class="size-4 md:mr-2" />
-        <span class="hidden md:inline">翻译</span>
       </Button>
       <Button variant="ghost" size="sm" :disabled="!editor" @click="openSummarize">
         <FileText class="size-4 md:mr-2" />

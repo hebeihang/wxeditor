@@ -33,7 +33,7 @@ const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
 const { isOpenRightSlider } = storeToRefs(uiStore)
 const cmdMgrOpen = ref(false)
-const cmdMgrMode = ref<'all' | 'title' | 'optimize' | 'expand' | 'connect' | 'translate' | 'summarize' | 'grammar' | 'continue' | 'outline'>('all')
+const cmdMgrMode = ref<'all' | 'title' | 'optimize' | 'expand' | 'connect' | 'summarize' | 'grammar' | 'continue' | 'outline'>('all')
 
 const generalAIConfigVisible = ref(false)
 const aiImageConfigVisible = ref(false)
@@ -48,7 +48,6 @@ function setCurrentGeneralStyle(id: string) {
   generalStyleId.value = id
 }
 const aiHideConnect = store.reactive<boolean>('ai_hide_connect', true)
-const aiHideTranslate = store.reactive<boolean>('ai_hide_translate', true)
 const aiHideGrammar = store.reactive<boolean>('ai_hide_grammar', true)
 const aiHideContinue = store.reactive<boolean>('ai_hide_continue', true)
 const aiHideOutline = store.reactive<boolean>('ai_hide_outline', true)
@@ -339,9 +338,6 @@ function handleCopy(mode: string) {
             <MenubarItem v-if="!aiHideConnect" @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
               衔接
             </MenubarItem>
-            <MenubarItem v-if="!aiHideTranslate" @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
-              翻译
-            </MenubarItem>
             <MenubarItem @click="cmdMgrMode = 'summarize'; cmdMgrOpen = true">
               摘要
             </MenubarItem>
@@ -446,9 +442,6 @@ function handleCopy(mode: string) {
                 <MenubarSub>
                   <MenubarItem v-if="!aiHideConnect" @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
                     衔接
-                  </MenubarItem>
-                  <MenubarItem v-if="!aiHideTranslate" @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
-                    翻译
                   </MenubarItem>
                   <MenubarItem @click="cmdMgrMode = 'summarize'; cmdMgrOpen = true">
                     摘要

@@ -30,7 +30,6 @@ type ToolVariant
     | 'outline'
     | 'optimize'
     | 'connect'
-    | 'translate'
     | 'summarize'
     | 'grammar'
     | 'continue'
@@ -71,7 +70,6 @@ const replacementText = ref(``)
 const notesText = ref(``)
 const showNotes = ref(false)
 const aiHideConnect = kvStore.reactive<boolean>('ai_hide_connect', true)
-const aiHideTranslate = kvStore.reactive<boolean>('ai_hide_translate', true)
 const aiHideGrammar = kvStore.reactive<boolean>('ai_hide_grammar', true)
 const aiHideContinue = kvStore.reactive<boolean>('ai_hide_continue', true)
 
@@ -81,7 +79,6 @@ const actionOptions = computed<ActionOption[]>(() => {
     { value: `optimize`, label: `润色`, defaultPrompt: getActionTemplate(`action:optimize`) || `请优化文本，使其更通顺易读。` },
     { value: `expand`, label: `扩展`, defaultPrompt: getActionTemplate(`action:expand`) || `请根据上下文对文本进行扩展，增加细节与示例。` },
     { value: `connect`, label: `衔接`, defaultPrompt: getActionTemplate(`action:connect`) || `使文本衔接更自然，补全隐含前提并说明。` },
-    { value: `translate`, label: `翻译`, defaultPrompt: getActionTemplate(`action:translate-en`) || `将文本翻译为目标语言，保留术语并说明。` },
     { value: `summarize`, label: `摘要`, defaultPrompt: getActionTemplate(`action:summarize`) || `先一句话总括，再列出要点。` },
     { value: `grammar`, label: `纠错`, defaultPrompt: getActionTemplate(`action:grammar`) || `检测并修正拼写、语法、标点与风格不一致。` },
     { value: `image`, label: `文生图`, defaultPrompt: `` },
@@ -91,7 +88,6 @@ const actionOptions = computed<ActionOption[]>(() => {
   ]
   return base.filter(
     o => (o.value !== 'connect' || !aiHideConnect.value)
-      && (o.value !== 'translate' || !aiHideTranslate.value)
       && (o.value !== 'grammar' || !aiHideGrammar.value)
       && (o.value !== 'continue' || !aiHideContinue.value),
   )
@@ -103,27 +99,7 @@ const selectedConnectIds = ref<string[]>([])
 try { selectedConnectIds.value = JSON.parse(connectTermsStr.value || '[]') }
 catch { selectedConnectIds.value = [] }
 
-const translateSourceLanguage = kvStore.reactive<string>('ai_translate_source_lang', 'auto')
-const translateTargetLanguage = kvStore.reactive<string>('ai_translate_target_lang', 'en')
-const translatePreserveNamedEntities = kvStore.reactive<boolean>('ai_translate_preserve_named', true)
-const translateTerminology = kvStore.reactive<string>('ai_translate_termi', '{}')
-const translateFormalLevel = kvStore.reactive<string>('ai_translate_formal_level', 'auto')
-const translatePreserveFormatting = kvStore.reactive<boolean>('ai_translate_preserve_formatting', true)
-const translatePreserveNumbersUnits = kvStore.reactive<boolean>('ai_translate_numbers_units', true)
-const translateAutoConvertUnits = kvStore.reactive<boolean>('ai_translate_units_convert', false)
-const translateLocalizationMode = kvStore.reactive<string>('ai_translate_localization_mode', 'Off')
-
 function normalizePresetAction(val?: string): ToolVariant {
-  if (val === 'translate-zh') {
-    translateSourceLanguage.value = 'auto'
-    translateTargetLanguage.value = 'zh-CN'
-    return 'translate'
-  }
-  if (val === 'translate-en') {
-    translateSourceLanguage.value = 'auto'
-    translateTargetLanguage.value = 'en'
-    return 'translate'
-  }
   if (val && actionValues.value.includes(val as ToolVariant))
     return val as ToolVariant
   return 'optimize'
@@ -200,20 +176,6 @@ watch(() => props.open, (val) => {
     const sel = props.selectedText.trim()
     if (sel) {
       currentText.value = sel
-      if ((selectedAction.value === 'translate')
-        && (!props.presetAction || props.presetAction === 'translate')
-        && translateSourceLanguage.value === 'auto'
-        && translateTargetLanguage.value === 'en') {
-        const hasHan = /[\u4E00-\u9FFF]/.test(sel)
-        const asciiLetters = (sel.match(/[A-Z]/gi) || []).length
-        const nonAscii = (sel.match(/[\x80-\uFFFF]/g) || []).length
-        if (hasHan || nonAscii > asciiLetters) {
-          translateTargetLanguage.value = 'en'
-        }
-        else {
-          translateTargetLanguage.value = 'zh-CN'
-        }
-      }
     }
     else if (selectedAction.value === 'continue') {
       currentText.value = deriveContinueContext()
@@ -291,13 +253,6 @@ watch(
     }
   },
 )
-// 当目标语言在设置面板变化时，翻译工具自动重置并按新语言运行
-watch(translateTargetLanguage, () => {
-  if (dialogVisible.value && selectedAction.value === 'translate') {
-    resetState()
-    nextTick().then(() => autoRunAIIfReady())
-  }
-})
 
 /* -------------------- prompt handlers -------------------- */
 function extractReplacementAndNotes(raw: string): { replacement: string, notes: string } {
@@ -421,12 +376,9 @@ async function runAIAction() {
   const payload = {
     model: model.value,
     messages,
-    temperature: (selectedAction.value === 'translate' ? Math.min(0.2, Number(temperature.value) || 0.2) : temperature.value),
-    max_tokens: (selectedAction.value === 'translate'
-      ? (Number(maxToken.value) || 1024)
-      : maxToken.value),
+    temperature: temperature.value,
+    max_tokens: maxToken.value,
     stream: true,
-    stop: (selectedAction.value === 'translate' && !forceTranslate.value ? ['</replacement>'] : undefined),
   }
 
   const headers: Record<string, string> = {
@@ -486,26 +438,6 @@ async function runAIAction() {
           }
         }
         catch {}
-      }
-    }
-    if (selectedAction.value === 'translate' && !forceTranslate.value) {
-      const usedContent = enforceStructure(currentText.value, sanitizeAIContent(replacementText.value || message.value))
-      const origNorm = currentText.value.replace(/\s+/g, '').toLowerCase()
-      const contNorm = usedContent.replace(/\s+/g, '').toLowerCase()
-      const tgt = translateTargetLanguage.value
-      const langOk = ((tgt === 'ja')
-        ? /[\u3040-\u30FF\u4E00-\u9FFF]/.test(usedContent)
-        : (tgt === 'zh-CN')
-            ? /[\u4E00-\u9FFF]/.test(usedContent)
-            : (tgt === 'ko')
-                ? /[\uAC00-\uD7A3]/.test(usedContent)
-                : true)
-      const hasPromptEcho = /严格限制|必须确保输出为|只使用目标语言输出/.test(usedContent)
-      if (!hasResult.value || contNorm === origNorm || contNorm.length === 0 || !langOk || hasPromptEcho) {
-        forceTranslate.value = true
-        loading.value = false
-        await nextTick()
-        runAIAction()
       }
     }
   }
@@ -607,45 +539,6 @@ function buildActionPrompt(inputText: string): string {
         : ''
       return `${base}${termsSection}${extra}`
     }
-    case 'translate': {
-      const languageNameMap: Record<string, string> = {
-        'zh-CN': '中文',
-        'en': 'English',
-        'ja': '日本語',
-        'ko': '한국어',
-        'de': 'Deutsch',
-        'fr': 'Français',
-        'it': 'Italiano',
-        'es': 'Español',
-        'pt': 'Português',
-      }
-      const targetLabel = languageNameMap[translateTargetLanguage.value] || translateTargetLanguage.value
-      const preserve = translatePreserveNamedEntities.value ? '保留专有名词（人名、公司名、产品名、地名、技术词）原文不翻译。' : ''
-      const fmt = translatePreserveFormatting.value ? '保留原文格式（换行、标题层级、粗体/斜体、列表、Markdown/HTML 标记）。' : ''
-      const num = translatePreserveNumbersUnits.value ? '保持原文数字与货币格式（例如 1,000 / ¥ / $ / €）。' : ''
-      const unit = translatePreserveNumbersUnits.value
-        ? (translateAutoConvertUnits.value ? '在合适场景自动进行公制/英制单位转换。' : '不要进行单位转换。')
-        : ''
-      const loc = translateLocalizationMode.value === 'Mild'
-        ? '本地化模式：轻度。在不改变原意的前提下，适度调整为目标语言常用表达。'
-        : translateLocalizationMode.value === 'Strong'
-          ? '本地化模式：强。优先目标语言文化的常用表达与可读性。'
-          : '本地化模式：关闭。以直译为主，仅在必要处做最小调整。'
-      let terminologySection = ''
-      try {
-        const t = translateTerminology.value?.trim() || '{}'
-        JSON.parse(t)
-        terminologySection = `术语表：${t}。`
-      }
-      catch {
-        terminologySection = `术语表：{}。`
-      }
-      const forceText = forceTranslate.value
-        ? '强制要求：逐句翻译为目标语言；任何未翻译或直接复述原文的内容均不合格，必须转化为目标语言表达。只使用目标语言输出，禁止出现其他语言。\n\n'
-        : ''
-      const base = `将以下文本从 ${translateSourceLanguage.value} 翻译到 ${targetLabel}（${translateTargetLanguage.value}），${preserve}${fmt}${num}${unit}${terminologySection}语域（Register）：${translateFormalLevel.value}。${loc}\n\n严格限制：不得扩写或增添任何新信息、例子、解释；逐句对齐并保持段落结构不变；句子数量与段落数量尽量与原文一致；整体长度与原文一致（允许极少量误差）；如原文不含以 # 或 -/* 开头的行，译文也不得添加标题或项目符号。\n\n必须确保输出为“目标语言”的表述，不得原样复述原文；若原文已是目标语言，也需改写为更地道的目标语言表达。只使用目标语言输出，禁止出现其他语言。\n\n${forceText}${inputText}\n\n只输出 <replacement>...</replacement>，不要输出 <notes>。输出 Markdown。不要使用除 <replacement> 外的任何标签。`
-      return `${base}${extra}`
-    }
     case 'summarize': {
       const style = getStyleLabel(summarizeStyleId.value)
       const keep = '必须保留关键信息（人名、机构、数字、结论、目标受众/目的等），不得遗漏或改变事实。'
@@ -708,20 +601,6 @@ function replaceText() {
   const editorView = toRaw(editorStore.editor!)!
   const sel = editorView.state.selection.main
   let content = enforceStructure(currentText.value, sanitizeAIContent(replacementText.value || message.value))
-  if (selectedAction.value === 'translate') {
-    const onlyReplacement = sanitizeAIContent(replacementText.value)
-    if (!onlyReplacement.trim()) {
-      error.value = '未检测到可替换的译文块，请重试（确保输出置于 <replacement> 标签）'
-      return
-    }
-    content = enforceStructure(currentText.value, onlyReplacement)
-    const origNorm = currentText.value.replace(/\s+/g, '').toLowerCase()
-    const contNorm = content.replace(/\s+/g, '').toLowerCase()
-    if (origNorm === contNorm || contNorm.length === 0) {
-      error.value = '翻译结果与原文一致或为空，请重试或切换目标语言设置'
-      return
-    }
-  }
   content = normalizeMarkdown(content)
   if (selectedAction.value !== 'outline' && selectedAction.value !== 'summarize')
     content = fixLeadingBullet(content)
@@ -1053,175 +932,6 @@ function fixLeadingBullet(text: string): string {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div v-if="false" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <div class="mb-1 text-sm font-medium">
-              源语言
-            </div>
-            <Select v-model="translateSourceLanguage">
-              <SelectTrigger class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="auto">
-                    Auto-detect
-                  </SelectItem>
-                  <SelectItem value="zh-CN">
-                    Chinese
-                  </SelectItem>
-                  <SelectItem value="en">
-                    English
-                  </SelectItem>
-                  <SelectItem value="ja">
-                    日本語
-                  </SelectItem>
-                  <SelectItem value="ko">
-                    한국어
-                  </SelectItem>
-                  <SelectItem value="de">
-                    Deutsch
-                  </SelectItem>
-                  <SelectItem value="fr">
-                    Français
-                  </SelectItem>
-                  <SelectItem value="it">
-                    Italiano
-                  </SelectItem>
-                  <SelectItem value="es">
-                    Español
-                  </SelectItem>
-                  <SelectItem value="pt">
-                    Português
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <div class="mb-1 text-sm font-medium">
-              目标语言
-            </div>
-            <Select v-model="translateTargetLanguage">
-              <SelectTrigger class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="zh-CN">
-                    Chinese
-                  </SelectItem>
-                  <SelectItem value="en">
-                    English
-                  </SelectItem>
-                  <SelectItem value="ja">
-                    日本語
-                  </SelectItem>
-                  <SelectItem value="ko">
-                    한국어
-                  </SelectItem>
-                  <SelectItem value="de">
-                    Deutsch
-                  </SelectItem>
-                  <SelectItem value="fr">
-                    Français
-                  </SelectItem>
-                  <SelectItem value="it">
-                    Italiano
-                  </SelectItem>
-                  <SelectItem value="es">
-                    Español
-                  </SelectItem>
-                  <SelectItem value="pt">
-                    Português
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="flex items-center gap-2">
-            <input id="translatePreserveNamedEntities" v-model="translatePreserveNamedEntities" type="checkbox">
-            <label for="translatePreserveNamedEntities" class="text-sm">保留专有名词(不翻译人名/公司名)</label>
-          </div>
-          <div>
-            <div class="mb-1 text-sm font-medium">
-              用语等级
-            </div>
-            <Select v-model="translateFormalLevel">
-              <SelectTrigger class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="auto">
-                    Auto
-                  </SelectItem>
-                  <SelectItem value="formal">
-                    Formal
-                  </SelectItem>
-                  <SelectItem value="neutral">
-                    Neutral
-                  </SelectItem>
-                  <SelectItem value="casual">
-                    Casual
-                  </SelectItem>
-                  <SelectItem value="polite">
-                    Polite
-                  </SelectItem>
-                  <SelectItem value="business">
-                    Business
-                  </SelectItem>
-                  <SelectItem value="academic">
-                    Academic
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="flex items-center gap-2">
-            <input id="translatePreserveFormatting" v-model="translatePreserveFormatting" type="checkbox">
-            <label for="translatePreserveFormatting" class="text-sm">保留格式（换行/标题/列表/Markdown/HTML）</label>
-          </div>
-          <div class="flex items-center gap-2">
-            <input id="translatePreserveNumbersUnits" v-model="translatePreserveNumbersUnits" type="checkbox">
-            <label for="translatePreserveNumbersUnits" class="text-sm">保持数字与货币格式</label>
-          </div>
-          <div class="flex items-center gap-2">
-            <input id="translateAutoConvertUnits" v-model="translateAutoConvertUnits" type="checkbox">
-            <label for="translateAutoConvertUnits" class="text-sm">自动进行单位转换（公制/英制）</label>
-          </div>
-          <div>
-            <div class="mb-1 text-sm font-medium">
-              本地化模式
-            </div>
-            <Select v-model="translateLocalizationMode">
-              <SelectTrigger class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="Off">
-                    Off
-                  </SelectItem>
-                  <SelectItem value="Mild">
-                    Mild
-                  </SelectItem>
-                  <SelectItem value="Strong">
-                    Strong
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="sm:col-span-2">
-            <div class="mb-1 text-sm font-medium">
-              术语表（可编辑，JSON）
-            </div>
-            <input type="file" accept=".json,application/json" class="w-full text-sm" @change="onGlossaryUpload">
-            <textarea v-model="translateTerminology" rows="4" class="w-full bg-transparent border rounded px-2 py-1 text-sm" placeholder="{&quot;产品名&quot;:&quot;ProductX&quot;}" />
           </div>
         </div>
 

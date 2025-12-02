@@ -8,7 +8,7 @@ import { useQuickCommands } from '@/stores/quickCommands'
 import { store as kvStore } from '@/utils/storage'
 
 /* ---------- 弹窗开关 ---------- */
-const props = defineProps<{ open: boolean, mode?: 'all' | 'title' | 'optimize' | 'expand' | 'connect' | 'translate' | 'summarize' | 'grammar' | 'continue' | 'outline' }>()
+const props = defineProps<{ open: boolean, mode?: 'all' | 'title' | 'optimize' | 'expand' | 'connect' | 'summarize' | 'grammar' | 'continue' | 'outline' }>()
 const emit = defineEmits([`update:open`])
 
 const dialogOpen = ref(props.open)
@@ -24,7 +24,6 @@ const titleMap: Record<string, string> = {
   optimize: '润色',
   expand: '扩展',
   connect: '衔接',
-  translate: '翻译',
   summarize: '摘要',
   grammar: '纠错',
   continue: '续写',
@@ -100,16 +99,6 @@ function onSave() {
   dialogOpen.value = false
 }
 
-const translateSourceLanguage = kvStore.reactive<string>('ai_translate_source_lang', 'auto')
-const translateTargetLanguage = kvStore.reactive<string>('ai_translate_target_lang', 'en')
-const translatePreserveNamedEntities = kvStore.reactive<boolean>('ai_translate_preserve_named', true)
-const translateTerminology = kvStore.reactive<string>('ai_translate_termi', '{}')
-const translateFormalLevel = kvStore.reactive<string>('ai_translate_formal_level', 'auto')
-const translatePreserveFormatting = kvStore.reactive<boolean>('ai_translate_preserve_formatting', true)
-const translatePreserveNumbersUnits = kvStore.reactive<boolean>('ai_translate_numbers_units', true)
-const translateAutoConvertUnits = kvStore.reactive<boolean>('ai_translate_units_convert', false)
-const translateLocalizationMode = kvStore.reactive<string>('ai_translate_localization_mode', 'Off')
-
 const summaryType = kvStore.reactive<string>('ai_summary_type', '精简摘要')
 const summaryLength = kvStore.reactive<string>('ai_summary_length', '50-100字')
 const summaryLengthCustom = kvStore.reactive<number>('ai_summary_length_custom', 100)
@@ -184,15 +173,6 @@ watch([
   polishCustomPrompt,
   expandTermsStr,
   connectTermsStr,
-  translateSourceLanguage,
-  translateTargetLanguage,
-  translatePreserveNamedEntities,
-  translateTerminology,
-  translateFormalLevel,
-  translatePreserveFormatting,
-  translatePreserveNumbersUnits,
-  translateAutoConvertUnits,
-  translateLocalizationMode,
   summaryType,
   summaryLength,
   summaryLengthCustom,
@@ -240,19 +220,6 @@ watch([
   outlineSettings.allow_expansion,
   outlineSettings.custom_instruction,
 ], () => {})
-
-async function onGlossaryUpload(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file)
-    return
-  const text = await file.text()
-  try {
-    JSON.parse(text)
-    translateTerminology.value = text
-  }
-  catch {}
-}
 </script>
 
 <template>
@@ -630,153 +597,6 @@ async function onGlossaryUpload(e: Event) {
             </Button>
           </div>
         </div>
-      </div>
-
-      <div v-if="mode === 'translate'" class="space-y-3 mt-4 border rounded-md p-3">
-        <Label class="mb-1">源语言</Label>
-        <Select v-model="translateSourceLanguage">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="auto">
-              Auto-detect
-            </SelectItem>
-            <SelectItem value="zh-CN">
-              Chinese
-            </SelectItem>
-            <SelectItem value="en">
-              English
-            </SelectItem>
-            <SelectItem value="ja">
-              日本語
-            </SelectItem>
-            <SelectItem value="ko">
-              한국어
-            </SelectItem>
-            <SelectItem value="de">
-              Deutsch
-            </SelectItem>
-            <SelectItem value="fr">
-              Français
-            </SelectItem>
-            <SelectItem value="it">
-              Italiano
-            </SelectItem>
-            <SelectItem value="es">
-              Español
-            </SelectItem>
-            <SelectItem value="pt">
-              Português
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">目标语言</Label>
-        <Select v-model="translateTargetLanguage">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="zh-CN">
-              Chinese
-            </SelectItem>
-            <SelectItem value="en">
-              English
-            </SelectItem>
-            <SelectItem value="ja">
-              日本語
-            </SelectItem>
-            <SelectItem value="ko">
-              한국어
-            </SelectItem>
-            <SelectItem value="de">
-              Deutsch
-            </SelectItem>
-            <SelectItem value="fr">
-              Français
-            </SelectItem>
-            <SelectItem value="it">
-              Italiano
-            </SelectItem>
-            <SelectItem value="es">
-              Español
-            </SelectItem>
-            <SelectItem value="pt">
-              Português
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">用语等级（Register）</Label>
-        <Select v-model="translateFormalLevel">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="auto">
-              Auto
-            </SelectItem>
-            <SelectItem value="formal">
-              Formal
-            </SelectItem>
-            <SelectItem value="neutral">
-              Neutral
-            </SelectItem>
-            <SelectItem value="casual">
-              Casual
-            </SelectItem>
-            <SelectItem value="polite">
-              Polite
-            </SelectItem>
-            <SelectItem value="business">
-              Business
-            </SelectItem>
-            <SelectItem value="academic">
-              Academic
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div class="flex items-center justify-between">
-          <Label>保留专有名词(不翻译人名/公司名)</Label>
-          <Switch v-model:checked="translatePreserveNamedEntities" />
-        </div>
-
-        <div class="flex items-center justify-between">
-          <Label>保留格式（换行/标题/列表/Markdown/HTML）</Label>
-          <Switch v-model:checked="translatePreserveFormatting" />
-        </div>
-        <div class="flex items-center justify-between">
-          <Label>保持数字与货币格式</Label>
-          <Switch v-model:checked="translatePreserveNumbersUnits" />
-        </div>
-        <div class="flex items-center justify-between">
-          <Label>自动进行单位转换（公制/英制）</Label>
-          <Switch v-model:checked="translateAutoConvertUnits" />
-        </div>
-
-        <Label class="mb-1">本地化模式</Label>
-        <Select v-model="translateLocalizationMode">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Off">
-              Off
-            </SelectItem>
-            <SelectItem value="Mild">
-              Mild
-            </SelectItem>
-            <SelectItem value="Strong">
-              Strong
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Label class="mb-1">术语表（JSON）</Label>
-        <input type="file" accept=".json,application/json" class="w-full text-sm" @change="onGlossaryUpload">
-        <Textarea v-model="translateTerminology" rows="3" />
       </div>
 
       <div v-if="mode === 'summarize'" class="space-y-3 mt-4 border rounded-md p-3">
