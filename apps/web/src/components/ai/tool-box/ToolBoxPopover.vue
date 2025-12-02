@@ -56,6 +56,7 @@ const hasResult = ref(false)
 const selectedAction = ref<ToolVariant>('optimize')
 const currentText = ref(``)
 const error = ref(``)
+const forceTranslate = ref(false)
 
 /* -------------------- store & refs -------------------- */
 const editorStore = useEditorStore()
@@ -69,20 +70,32 @@ const originalDiffHtml = ref(``)
 const replacementText = ref(``)
 const notesText = ref(``)
 const showNotes = ref(false)
+const aiHideConnect = kvStore.reactive<boolean>('ai_hide_connect', true)
+const aiHideTranslate = kvStore.reactive<boolean>('ai_hide_translate', true)
+const aiHideGrammar = kvStore.reactive<boolean>('ai_hide_grammar', true)
+const aiHideContinue = kvStore.reactive<boolean>('ai_hide_continue', true)
 
 const getActionTemplate = (id: string) => quickCmdStore.commands.find(c => c.id === id)?.template || ''
-const actionOptions = computed<ActionOption[]>(() => [
-  { value: `optimize`, label: `润色`, defaultPrompt: getActionTemplate(`action:optimize`) || `请优化文本，使其更通顺易读。` },
-  { value: `expand`, label: `扩展`, defaultPrompt: getActionTemplate(`action:expand`) || `请根据上下文对文本进行扩展，增加细节与示例。` },
-  { value: `connect`, label: `衔接`, defaultPrompt: getActionTemplate(`action:connect`) || `使文本衔接更自然，补全隐含前提并说明。` },
-  { value: `translate`, label: `翻译`, defaultPrompt: getActionTemplate(`action:translate-en`) || `将文本翻译为目标语言，保留术语并说明。` },
-  { value: `summarize`, label: `摘要`, defaultPrompt: getActionTemplate(`action:summarize`) || `先一句话总括，再列出要点。` },
-  { value: `grammar`, label: `纠错`, defaultPrompt: getActionTemplate(`action:grammar`) || `检测并修正拼写、语法、标点与风格不一致。` },
-  { value: `image`, label: `文生图`, defaultPrompt: `` },
-  { value: `continue`, label: `续写`, defaultPrompt: getActionTemplate(`action:continue`) || `从当前文本结尾继续写，保持语境连贯。` },
-  { value: `outline`, label: `大纲`, defaultPrompt: getActionTemplate(`action:outline`) || `生成层级化写作大纲，输出 Markdown 标题。` },
-  { value: `custom`, label: `自定义`, defaultPrompt: `` },
-])
+const actionOptions = computed<ActionOption[]>(() => {
+  const base: ActionOption[] = [
+    { value: `optimize`, label: `润色`, defaultPrompt: getActionTemplate(`action:optimize`) || `请优化文本，使其更通顺易读。` },
+    { value: `expand`, label: `扩展`, defaultPrompt: getActionTemplate(`action:expand`) || `请根据上下文对文本进行扩展，增加细节与示例。` },
+    { value: `connect`, label: `衔接`, defaultPrompt: getActionTemplate(`action:connect`) || `使文本衔接更自然，补全隐含前提并说明。` },
+    { value: `translate`, label: `翻译`, defaultPrompt: getActionTemplate(`action:translate-en`) || `将文本翻译为目标语言，保留术语并说明。` },
+    { value: `summarize`, label: `摘要`, defaultPrompt: getActionTemplate(`action:summarize`) || `先一句话总括，再列出要点。` },
+    { value: `grammar`, label: `纠错`, defaultPrompt: getActionTemplate(`action:grammar`) || `检测并修正拼写、语法、标点与风格不一致。` },
+    { value: `image`, label: `文生图`, defaultPrompt: `` },
+    { value: `continue`, label: `续写`, defaultPrompt: getActionTemplate(`action:continue`) || `从当前文本结尾继续写，保持语境连贯。` },
+    { value: `outline`, label: `大纲`, defaultPrompt: getActionTemplate(`action:outline`) || `生成层级化写作大纲，输出 Markdown 标题。` },
+    { value: `custom`, label: `自定义`, defaultPrompt: `` },
+  ]
+  return base.filter(
+    o => (o.value !== 'connect' || !aiHideConnect.value)
+      && (o.value !== 'translate' || !aiHideTranslate.value)
+      && (o.value !== 'grammar' || !aiHideGrammar.value)
+      && (o.value !== 'continue' || !aiHideContinue.value),
+  )
+})
 const actionValues = computed<ToolVariant[]>(() => actionOptions.value.map(o => o.value as ToolVariant))
 
 const connectTermsStr = kvStore.reactive<string>('ai_connect_terms', '[]')
@@ -182,6 +195,20 @@ watch(() => props.open, (val) => {
     const sel = props.selectedText.trim()
     if (sel) {
       currentText.value = sel
+      if ((selectedAction.value === 'translate')
+        && (!props.presetAction || props.presetAction === 'translate')
+        && translateSourceLanguage.value === 'auto'
+        && translateTargetLanguage.value === 'en') {
+        const hasHan = /[\u4E00-\u9FFF]/.test(sel)
+        const asciiLetters = (sel.match(/[A-Z]/gi) || []).length
+        const nonAscii = (sel.match(/[\x80-\uFFFF]/g) || []).length
+        if (hasHan || nonAscii > asciiLetters) {
+          translateTargetLanguage.value = 'en'
+        }
+        else {
+          translateTargetLanguage.value = 'zh-CN'
+        }
+      }
     }
     else if (selectedAction.value === 'continue') {
       currentText.value = deriveContinueContext()
@@ -259,6 +286,13 @@ watch(
     }
   },
 )
+// 当目标语言在设置面板变化时，翻译工具自动重置并按新语言运行
+watch(translateTargetLanguage, () => {
+  if (dialogVisible.value && selectedAction.value === 'translate') {
+    resetState()
+    nextTick().then(() => autoRunAIIfReady())
+  }
+})
 
 /* -------------------- prompt handlers -------------------- */
 function extractReplacementAndNotes(raw: string): { replacement: string, notes: string } {
@@ -282,28 +316,9 @@ function extractReplacementAndNotes(raw: string): { replacement: string, notes: 
       .replace(/<notes>[\s\S]*$/i, '')
       .trim()
     candidateRep = candidateRep.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '').trim()
+    // 去除模型误复述的提示词块
+    candidateRep = candidateRep.replace(/(?:^|\n)\s*(严格限制|必须确保输出为|只使用目标语言输出)[\s\S]*?(?:\n{2,}|$)/g, '')
     replacement = candidateRep
-  }
-  if (!replacement) {
-    let stripped = raw
-      .replace(/<notes>[\s\S]*?<\/notes>/gi, '')
-      .replace(/<notes>[\s\S]*$/i, '')
-      .replace(/<\/?replacement>/gi, '')
-      .trim()
-    stripped = stripped.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '')
-    const idx = stripped.search(/\n#{1,6}\s|\n(?:术语与决策说明|说明|Notes)/i)
-    if (idx > 0) {
-      replacement = stripped.slice(0, idx).trim()
-      if (!notes)
-        notes = stripped.slice(idx).trim()
-    }
-    if (!replacement) {
-      const fence = stripped.match(/```[\s\S]*?```/)
-      if (fence)
-        replacement = fence[0].replace(/```/g, '').trim()
-    }
-    if (!replacement)
-      replacement = stripped
   }
   const idx2 = replacement.search(/\n(?:#{1,6}\s*)?(?:术语与决策说明|说明|Notes?|Explanation|Reasoning)\s*[:：\n]/i)
   if (idx2 > 0) {
@@ -321,6 +336,7 @@ function sanitizeAIContent(raw: string): string {
   s = s.replace(/<notes>[\s\S]*$/i, '')
   s = s.replace(/<\/?replacement>/gi, '')
   s = s.replace(/<\/?(?!replacement\b|notes\b)[a-z][\w-]*\b[^>]*>/gi, '')
+  s = s.replace(/\{\{\s*sel\s*\}\}/gi, '')
   return s.trim()
 }
 
@@ -360,6 +376,7 @@ function resetState() {
 
   abortController.value?.abort()
   abortController.value = null
+  forceTranslate.value = false
 }
 
 async function onGlossaryUpload(e: Event) {
@@ -401,10 +418,10 @@ async function runAIAction() {
     messages,
     temperature: (selectedAction.value === 'translate' ? Math.min(0.2, Number(temperature.value) || 0.2) : temperature.value),
     max_tokens: (selectedAction.value === 'translate'
-      ? Math.min(Number(maxToken.value) || 1024, Math.max(64, Math.floor((text.length || 0) / 3) + 64))
+      ? (Number(maxToken.value) || 1024)
       : maxToken.value),
     stream: true,
-    stop: (selectedAction.value === 'translate' ? ['</replacement>'] : undefined),
+    stop: (selectedAction.value === 'translate' && !forceTranslate.value ? ['</replacement>'] : undefined),
   }
 
   const headers: Record<string, string> = {
@@ -466,6 +483,26 @@ async function runAIAction() {
         catch {}
       }
     }
+    if (selectedAction.value === 'translate' && !forceTranslate.value) {
+      const usedContent = enforceStructure(currentText.value, sanitizeAIContent(replacementText.value || message.value))
+      const origNorm = currentText.value.replace(/\s+/g, '').toLowerCase()
+      const contNorm = usedContent.replace(/\s+/g, '').toLowerCase()
+      const tgt = translateTargetLanguage.value
+      const langOk = ((tgt === 'ja')
+        ? /[\u3040-\u30FF\u4E00-\u9FFF]/.test(usedContent)
+        : (tgt === 'zh-CN')
+            ? /[\u4E00-\u9FFF]/.test(usedContent)
+            : (tgt === 'ko')
+                ? /[\uAC00-\uD7A3]/.test(usedContent)
+                : true)
+      const hasPromptEcho = /严格限制|必须确保输出为|只使用目标语言输出/.test(usedContent)
+      if (!hasResult.value || contNorm === origNorm || contNorm.length === 0 || !langOk || hasPromptEcho) {
+        forceTranslate.value = true
+        loading.value = false
+        await nextTick()
+        runAIAction()
+      }
+    }
   }
   catch (e: any) {
     if (e.name === `AbortError`) {
@@ -506,6 +543,8 @@ function buildActionPrompt(inputText: string): string {
       const custom = kvStore.reactive<string>('ai_polish_custom', '')
 
       const style = getStyleLabel(polishStyleId.value)
+      const styleCmd = quickCmdStore.commands.find(c => c.id === polishStyleId.value)
+      const styleDetail = styleCmd ? styleCmd.template.replace(/\n\s*\{\{\s*sel\s*\}\}/i, '').trim() : ''
       const tone = getToneLabel(polishToneId.value || 'none')
       const preserve = preserveNames.value ? '保留专有名词（人名、品牌、技术名词、机构名等）原样不改。' : ''
       const strength = `润色强度：${polishStrength.value}/100（强度越高改动越大）。`
@@ -530,7 +569,24 @@ function buildActionPrompt(inputText: string): string {
           : '目标读者：大众读者。术语解释充分，句式简洁，避免过多缩写。'
       const customText = custom.value?.trim() ? `自定义指令优先：${custom.value.trim()}。` : ''
 
-      const base = `请根据以下设置对文本进行润色，严格遵守文风与语气，只输出润色后的 Markdown 文本，不要任何解释或附加说明。将结果置于 <replacement>...</replacement>，不要输出 <notes> 标签或其他标签。\n\n设置：\n- 文风：${style}\n- 语气：${tone}\n- ${strength}\n- ${lenText}\n- ${structText}\n- ${readText}\n- ${preserve}\n- ${customText}\n\n文本：\n${inputText}`
+      const policyMap = {
+        'style:official': { len: '字数保持原文 90%～110%', struct: '不新增结构（标题/段落/列表），仅在原句体现“现状—问题—建议”' },
+        'style:editorial': { len: '字数保持原文 90%～110%', struct: '不新增标题/列表，不新增论据或背景，仅强化观点语气' },
+        'style:legal': { len: '字数保持原文 90%～110%', struct: '仅在原有结构存在时可保留小标题（事实/争点/法律/分析/结论），不新增法律条款与分析' },
+        'style:business-letter': { len: '字数保持原文 90%～110%', struct: '格式：[称呼] 正文 [结束语] [署名]；不得新增额外礼貌语或结尾语' },
+        'style:investment': { len: '字数保持原文 90%～110%', struct: '必须保留原有标题结构（概况/估值/风险点/预测/结论），不得删除或新增段落' },
+        'style:ppt-brief': { len: '字数保持原文 90%～110%', struct: '不得新增标题或列表；如原文已有列表，仅微调措辞不可增加条目' },
+        'style:business': { len: '字数保持原文 90%～110%', struct: '不新增标题或列表；使用“总体来看/核心在于/基于当前数据”等句式' },
+        'style:news-report': { len: '字数保持原文 90%～110%', struct: '不新增标题或列表；导语概述事实，不加入无来源句' },
+        'style:popular-science': { len: '字数保持原文 90%～110%', struct: '不新增标题或比喻，仅在原句上简化表达' },
+        'style:tech-writing': { len: '字数保持原文 90%～110%', struct: '不新增标题或列表；保持过程性说明的克制表达' },
+        'style:academic': { len: '字数保持原文 90%～110%', struct: '不新增标题或列表；使用“然而/值得注意”等中性连接词' },
+        'style:whitepaper': { len: '字数保持原文 90%～110%', struct: '不新增章节块或列表；保持报告语气' },
+        'style:product-ops': { len: '字数保持原文 90%～110%', struct: '不得新增标题；如原文已有列表，仅可微调措辞不可增加条目' },
+      } as Record<string, { len: string, struct: string }>
+      const policy = policyMap[polishStyleId.value] || { len: '保持原文长度', struct: '不新增结构' }
+
+      const base = `请严格按照指定文风重写文本（不是仅润色）。禁止新增或虚构信息，必须保持所有事实一致。只输出润色后的 Markdown 文本，不要任何解释或附加说明。将结果置于 <replacement>...</replacement>，不要输出 <notes> 标签或其他标签。\n\n设置：\n- 文风：${style}\n- 语气：${tone}\n- ${strength}\n- 长度：${policy.len}\n- 结构：${policy.struct}\n- ${readText}\n- ${preserve}\n- ${customText}${styleDetail ? `\n- 风格细则：${styleDetail}` : ''}\n\n仅允许在原句基础上进行风格化语言替换，不改变信息量与段落数量。\n\n文本：\n${inputText}`
       return `${base}${extra}`
     }
     case 'expand': {
@@ -561,6 +617,18 @@ function buildActionPrompt(inputText: string): string {
       return `${base}${termsSection}${extra}`
     }
     case 'translate': {
+      const languageNameMap: Record<string, string> = {
+        'zh-CN': '中文',
+        'en': 'English',
+        'ja': '日本語',
+        'ko': '한국어',
+        'de': 'Deutsch',
+        'fr': 'Français',
+        'it': 'Italiano',
+        'es': 'Español',
+        'pt': 'Português',
+      }
+      const targetLabel = languageNameMap[translateTargetLanguage.value] || translateTargetLanguage.value
       const preserve = translatePreserveNamedEntities.value ? '保留专有名词（人名、公司名、产品名、地名、技术词）原文不翻译。' : ''
       const fmt = translatePreserveFormatting.value ? '保留原文格式（换行、标题层级、粗体/斜体、列表、Markdown/HTML 标记）。' : ''
       const num = translatePreserveNumbersUnits.value ? '保持原文数字与货币格式（例如 1,000 / ¥ / $ / €）。' : ''
@@ -581,17 +649,17 @@ function buildActionPrompt(inputText: string): string {
       catch {
         terminologySection = `术语表：{}。`
       }
-      const base = `将以下文本从 ${translateSourceLanguage.value} 翻译到 ${translateTargetLanguage.value}，${preserve}${fmt}${num}${unit}${terminologySection}语域（Register）：${translateFormalLevel.value}。${loc}\n\n严格限制：不得扩写或增添任何新信息、例子、解释；逐句对齐并保持段落结构不变；句子数量与段落数量尽量与原文一致；整体长度与原文一致（允许极少量误差）；如原文不含以 # 或 -/* 开头的行，译文也不得添加标题或项目符号。\n\n${inputText}\n\n只输出 <replacement>...</replacement>，不要输出 <notes>。输出 Markdown。不要使用除 <replacement> 外的任何标签。`
+      const forceText = forceTranslate.value
+        ? '强制要求：逐句翻译为目标语言；任何未翻译或直接复述原文的内容均不合格，必须转化为目标语言表达。只使用目标语言输出，禁止出现其他语言。\n\n'
+        : ''
+      const base = `将以下文本从 ${translateSourceLanguage.value} 翻译到 ${targetLabel}（${translateTargetLanguage.value}），${preserve}${fmt}${num}${unit}${terminologySection}语域（Register）：${translateFormalLevel.value}。${loc}\n\n严格限制：不得扩写或增添任何新信息、例子、解释；逐句对齐并保持段落结构不变；句子数量与段落数量尽量与原文一致；整体长度与原文一致（允许极少量误差）；如原文不含以 # 或 -/* 开头的行，译文也不得添加标题或项目符号。\n\n必须确保输出为“目标语言”的表述，不得原样复述原文；若原文已是目标语言，也需改写为更地道的目标语言表达。只使用目标语言输出，禁止出现其他语言。\n\n${forceText}${inputText}\n\n只输出 <replacement>...</replacement>，不要输出 <notes>。输出 Markdown。不要使用除 <replacement> 外的任何标签。`
       return `${base}${extra}`
     }
     case 'summarize': {
       const style = getStyleLabel(summarizeStyleId.value)
-      const mode = summarizeCompressionMode.value
-      const val = summarizeCompressionValue.value
-      const modeText = mode === '百分比' ? `压缩为原文的 ${val}%` : `目标字数 ${val}`
-      const keep = summarizePreserveKeyPoints.value ? '优先保留关键要点。' : ''
-      const omit = summarizeExplainOmissions.value ? '列出被省略的重要信息。' : ''
-      const base = `将以下文本压缩（模式：${mode}，值：${val}），输出风格：${style}。${keep}${omit}先给出一句话总括，必要时再列出要点。将用于替换原文的文本置于 <replacement>...</replacement>，将解释或省略信息置于 <notes>...</notes>。输出 Markdown。不要使用除 <replacement>/<notes> 外的任何标签。\n\n文本：\n${inputText}\n\n提示：${modeText}。`
+      const keep = '必须保留关键信息（人名、机构、数字、结论、目标受众/目的等），不得遗漏或改变事实。'
+      const guidance = '避免过度压缩；先一句话总括核心信息，再用 3–7 条要点列出重要细节与脉络（主题、对象、作用、特色、场景/示例等）。如需删减，请在 <notes> 中说明被省略的内容。'
+      const base = `请对以下文本进行“信息充足的摘要”，输出风格：${style}。${keep}${guidance}只输出 Markdown 文本：将摘要置于 <replacement>...</replacement>，说明与省略信息置于 <notes>...</notes>；不要使用除 <replacement>/<notes> 以外的标签。\n\n文本：\n${inputText}`
       return `${base}${extra}`
     }
     case 'grammar': {
@@ -649,6 +717,20 @@ function replaceText() {
   const editorView = toRaw(editorStore.editor!)!
   const sel = editorView.state.selection.main
   let content = enforceStructure(currentText.value, sanitizeAIContent(replacementText.value || message.value))
+  if (selectedAction.value === 'translate') {
+    const onlyReplacement = sanitizeAIContent(replacementText.value)
+    if (!onlyReplacement.trim()) {
+      error.value = '未检测到可替换的译文块，请重试（确保输出置于 <replacement> 标签）'
+      return
+    }
+    content = enforceStructure(currentText.value, onlyReplacement)
+    const origNorm = currentText.value.replace(/\s+/g, '').toLowerCase()
+    const contNorm = content.replace(/\s+/g, '').toLowerCase()
+    if (origNorm === contNorm || contNorm.length === 0) {
+      error.value = '翻译结果与原文一致或为空，请重试或切换目标语言设置'
+      return
+    }
+  }
   content = normalizeMarkdown(content)
   if (selectedAction.value !== 'outline' && selectedAction.value !== 'summarize')
     content = fixLeadingBullet(content)

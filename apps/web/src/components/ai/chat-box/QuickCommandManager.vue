@@ -114,7 +114,7 @@ const summaryType = kvStore.reactive<string>('ai_summary_type', '精简摘要')
 const summaryLength = kvStore.reactive<string>('ai_summary_length', '50-100字')
 const summaryLengthCustom = kvStore.reactive<number>('ai_summary_length_custom', 100)
 const preserveKeyInfo = kvStore.reactive<boolean>('ai_summary_preserve_key_info', true)
-const compressionRatio = kvStore.reactive<string>('ai_summary_compression_ratio', '30%')
+const compressionRatio = kvStore.reactive<string>('ai_summary_compression_ratio', 'auto')
 const keepOriginalOpinions = kvStore.reactive<string>('ai_summary_keep_original_opinions', '可适度重述')
 const structureFollowing = kvStore.reactive<string>('ai_summary_structure_following', 'mild')
 const toneStyle = kvStore.reactive<string>('ai_summary_tone_style', '中性学术')
@@ -809,67 +809,9 @@ async function onGlossaryUpload(e: Event) {
           </Select>
         </div>
 
-        <div>
-          <Label class="mb-1">摘要长度</Label>
-          <Select v-model="summaryLength">
-            <SelectTrigger class="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="20-50字">
-                极短（20–50字）
-              </SelectItem>
-              <SelectItem value="50-100字">
-                短（50–100字）
-              </SelectItem>
-              <SelectItem value="100-200字">
-                中等（100–200字）
-              </SelectItem>
-              <SelectItem value="200-400字">
-                长（200–400字）
-              </SelectItem>
-              <SelectItem value="自定义">
-                自定义字数
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <div v-if="summaryLength === '自定义'" class="mt-2">
-            <Label class="mb-1">自定义字数</Label>
-            <NumberField v-model="summaryLengthCustom" :min="20" :max="1000" :step="10">
-              <NumberFieldContent><NumberFieldInput /></NumberFieldContent>
-            </NumberField>
-          </div>
-        </div>
-
         <div class="flex items-center justify-between">
           <Label>保留关键信息（人名/机构/数字/结论）</Label>
           <Switch v-model:checked="preserveKeyInfo" />
-        </div>
-
-        <div>
-          <Label class="mb-1">内容压缩比例</Label>
-          <Select v-model="compressionRatio">
-            <SelectTrigger class="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10%">
-                10%
-              </SelectItem>
-              <SelectItem value="20%">
-                20%
-              </SelectItem>
-              <SelectItem value="30%">
-                30%
-              </SelectItem>
-              <SelectItem value="50%">
-                50%
-              </SelectItem>
-              <SelectItem value="auto">
-                自动
-              </SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         <div>
@@ -959,7 +901,7 @@ async function onGlossaryUpload(e: Event) {
         </div>
 
         <div class="text-xs text-muted-foreground">
-          字数优先于压缩比例；如启用保留关键信息，则人名、机构名、数字与结论不得改写；允许引用时，引用不超过摘要内容的30%；默认输出为 Markdown 格式。
+          如启用保留关键信息，则人名、机构名、数字与结论不得改写；允许引用时，引用不超过摘要内容的30%；默认输出为 Markdown 格式。
         </div>
       </div>
 

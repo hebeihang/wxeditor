@@ -47,6 +47,11 @@ const generalStyleId = store.reactive<string>('ai_general_style', 'general-style
 function setCurrentGeneralStyle(id: string) {
   generalStyleId.value = id
 }
+const aiHideConnect = store.reactive<boolean>('ai_hide_connect', true)
+const aiHideTranslate = store.reactive<boolean>('ai_hide_translate', true)
+const aiHideGrammar = store.reactive<boolean>('ai_hide_grammar', true)
+const aiHideContinue = store.reactive<boolean>('ai_hide_continue', true)
+const aiHideOutline = store.reactive<boolean>('ai_hide_outline', true)
 
 // Editor refresh function
 function editorRefresh() {
@@ -247,6 +252,16 @@ async function copy() {
     })
   }, 350)
 }
+
+function handleCopy(mode: string) {
+  copyMode.value = mode
+  copy()
+}
+
+function copyToWeChat() {
+  copyMode.value = 'txt'
+  copy()
+}
 </script>
 
 <template>
@@ -257,7 +272,7 @@ async function copy() {
     <div class="space-x-1 hidden md:flex">
       <Menubar class="menubar border-0">
         <FileDropdown @open-editor-state="handleOpenEditorState" />
-        <EditDropdown />
+        <EditDropdown @copy="handleCopy" />
         <FormatDropdown />
         <InsertDropdown />
         <StyleDropdown />
@@ -323,25 +338,25 @@ async function copy() {
             <MenubarItem @click="cmdMgrMode = 'optimize'; cmdMgrOpen = true">
               润色
             </MenubarItem>
-            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
+            <MenubarItem @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
               扩展
             </MenubarItem>
-            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
+            <MenubarItem v-if="!aiHideConnect" @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
               衔接
             </MenubarItem>
-            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
+            <MenubarItem v-if="!aiHideTranslate" @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
               翻译
             </MenubarItem>
-            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'summarize'; cmdMgrOpen = true">
+            <MenubarItem @click="cmdMgrMode = 'summarize'; cmdMgrOpen = true">
               摘要
             </MenubarItem>
-            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'grammar'; cmdMgrOpen = true">
+            <MenubarItem v-if="!aiHideGrammar" @click="cmdMgrMode = 'grammar'; cmdMgrOpen = true">
               纠错
             </MenubarItem>
-            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'continue'; cmdMgrOpen = true">
+            <MenubarItem v-if="!aiHideContinue" @click="cmdMgrMode = 'continue'; cmdMgrOpen = true">
               续写
             </MenubarItem>
-            <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'outline'; cmdMgrOpen = true">
+            <MenubarItem v-if="!aiHideOutline" @click="cmdMgrMode = 'outline'; cmdMgrOpen = true">
               大纲
             </MenubarItem>
 
@@ -363,7 +378,7 @@ async function copy() {
           </MenubarTrigger>
           <MenubarContent align="start">
             <FileDropdown :as-sub="true" @open-editor-state="handleOpenEditorState" />
-            <EditDropdown :as-sub="true" />
+            <EditDropdown :as-sub="true" @copy="handleCopy" />
             <FormatDropdown :as-sub="true" />
             <InsertDropdown :as-sub="true" />
             <StyleDropdown :as-sub="true" />
@@ -430,31 +445,31 @@ async function copy() {
                 <MenubarItem @click="cmdMgrMode = 'optimize'; cmdMgrOpen = true">
                   润色
                 </MenubarItem>
-                <MenubarItem v-if="!uiStore.limitedAI" @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
+                <MenubarItem @click="cmdMgrMode = 'expand'; cmdMgrOpen = true">
                   扩展
                 </MenubarItem>
-                <MenubarSub v-if="!uiStore.limitedAI">
-                  <MenubarItem @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
+                <MenubarSub>
+                  <MenubarItem v-if="!aiHideConnect" @click="cmdMgrMode = 'connect'; cmdMgrOpen = true">
                     衔接
                   </MenubarItem>
-                  <MenubarItem @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
+                  <MenubarItem v-if="!aiHideTranslate" @click="cmdMgrMode = 'translate'; cmdMgrOpen = true">
                     翻译
                   </MenubarItem>
                   <MenubarItem @click="cmdMgrMode = 'summarize'; cmdMgrOpen = true">
                     摘要
                   </MenubarItem>
-                  <MenubarItem @click="cmdMgrMode = 'grammar'; cmdMgrOpen = true">
+                  <MenubarItem v-if="!aiHideGrammar" @click="cmdMgrMode = 'grammar'; cmdMgrOpen = true">
                     纠错
                   </MenubarItem>
-                  <MenubarItem @click="cmdMgrMode = 'continue'; cmdMgrOpen = true">
+                  <MenubarItem v-if="!aiHideContinue" @click="cmdMgrMode = 'continue'; cmdMgrOpen = true">
                     续写
                   </MenubarItem>
-                  <MenubarItem @click="cmdMgrMode = 'outline'; cmdMgrOpen = true">
+                  <MenubarItem v-if="!aiHideOutline" @click="cmdMgrMode = 'outline'; cmdMgrOpen = true">
                     大纲
                   </MenubarItem>
 
                   <MenubarSeparator />
-                </menubarsub>
+                </MenubarSub>
               </MenubarSubContent>
             </MenubarSub>
             <HelpDropdown :as-sub="true" @open-about="handleOpenAbout" @open-fund="handleOpenFund" />
@@ -508,10 +523,12 @@ async function copy() {
       <!-- 样式面板 -->
       <Button
         variant="outline"
-        size="icon"
+        class="h-9"
+        :class="{ 'bg-accent text-accent-foreground': isOpenRightSlider }"
         @click="isOpenRightSlider = !isOpenRightSlider"
       >
-        <Palette class="size-4" />
+        <Palette class="mr-2 h-4 w-4" />
+        <span>样式</span>
       </Button>
     </div>
   </header>

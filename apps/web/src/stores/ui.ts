@@ -31,9 +31,6 @@ export const useUIStore = defineStore(`ui`, () => {
   // 是否为移动端
   const isMobile = store.reactive(`isMobile`, false)
 
-  // 是否启用受限 AI 模式
-  const limitedAI = store.reactive(`limitedAI`, true)
-
   // 是否固定显示浮动目录
   const isPinFloatingToc = store.reactive(addPrefix(`isPinFloatingToc`), false)
   const togglePinFloatingToc = useToggle(isPinFloatingToc)
@@ -131,7 +128,6 @@ export const useUIStore = defineStore(`ui`, () => {
     isOpenRightSlider,
     isOpenPostSlider,
     isMobile,
-    limitedAI,
     isPinFloatingToc,
     isShowFloatingToc,
 

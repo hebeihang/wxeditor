@@ -5,18 +5,24 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useEditorStore } from '@/stores/editor'
 import { useUIStore } from '@/stores/ui'
+import { store as kvStore } from '@/utils/storage'
 
 const editorStore = useEditorStore()
 const uiStore = useUIStore()
 
 const { editor } = storeToRefs(editorStore)
-const { isMobile, limitedAI } = storeToRefs(uiStore)
+const { isMobile } = storeToRefs(uiStore)
 
 const toolBoxVisible = ref(false)
 const presetAction = ref<
   `optimize` | `expand` | `connect` | `translate` | `summarize` | `grammar` | `continue` | `outline`
 >(`optimize`)
 const popoverRef = useTemplateRef<InstanceType<typeof AIPolishPopover>>('popoverRef')
+const aiHideConnect = kvStore.reactive<boolean>('ai_hide_connect', true)
+const aiHideTranslate = kvStore.reactive<boolean>('ai_hide_translate', true)
+const aiHideGrammar = kvStore.reactive<boolean>('ai_hide_grammar', true)
+const aiHideContinue = kvStore.reactive<boolean>('ai_hide_continue', true)
+const aiHideOutline = kvStore.reactive<boolean>('ai_hide_outline', true)
 
 function getSelectedText() {
   try {
@@ -74,29 +80,28 @@ function openOutline() {
         <WandSparkles class="size-4 md:mr-2" />
         <span class="hidden md:inline">润色</span>
       </Button>
-      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openExpand">
+      <Button variant="ghost" size="sm" :disabled="!editor" @click="openExpand">
         <PlusCircle class="size-4 md:mr-2" />
         <span class="hidden md:inline">扩展</span>
       </Button>
-      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openConnect">
+      <Button v-if="!aiHideConnect" variant="ghost" size="sm" :disabled="!editor" @click="openConnect">
         <LinkIcon class="size-4 md:mr-2" />
         <span class="hidden md:inline">衔接</span>
       </Button>
-      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openTranslate">
+      <Button v-if="!aiHideTranslate" variant="ghost" size="sm" :disabled="!editor" @click="openTranslate">
         <Globe class="size-4 md:mr-2" />
         <span class="hidden md:inline">翻译</span>
       </Button>
-      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openSummarize">
+      <Button variant="ghost" size="sm" :disabled="!editor" @click="openSummarize">
         <FileText class="size-4 md:mr-2" />
         <span class="hidden md:inline">摘要</span>
       </Button>
-      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openGrammar">
+      <Button v-if="!aiHideGrammar" variant="ghost" size="sm" :disabled="!editor" @click="openGrammar">
         <Check class="size-4 md:mr-2" />
         <span class="hidden md:inline">纠错</span>
       </Button>
 
       <Button
-        v-if="!limitedAI"
         variant="ghost"
         size="sm"
         :disabled="!editor"
@@ -118,11 +123,11 @@ function openOutline() {
         <span class="hidden md:inline">文生图</span>
       </Button>
 
-      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openContinue">
+      <Button v-if="!aiHideContinue" variant="ghost" size="sm" :disabled="!editor" @click="openContinue">
         <PenLine class="size-4 md:mr-2" />
         <span class="hidden md:inline">续写</span>
       </Button>
-      <Button v-if="!limitedAI" variant="ghost" size="sm" :disabled="!editor" @click="openOutline">
+      <Button v-if="!aiHideOutline" variant="ghost" size="sm" :disabled="!editor" @click="openOutline">
         <ListTree class="size-4 md:mr-2" />
         <span class="hidden md:inline">大纲</span>
       </Button>

@@ -2,7 +2,7 @@
 import type { DecorationSet } from '@codemirror/view'
 import { StateEffect, StateField } from '@codemirror/state'
 import { Decoration, EditorView } from '@codemirror/view'
-import { ChevronDown, ChevronRight, ChevronUp, Replace, ReplaceAll, X } from 'lucide-vue-next'
+import { CaseSensitive, ChevronDown, ChevronRight, ChevronUp, Regex, Replace, ReplaceAll, WholeWord, X } from 'lucide-vue-next'
 
 const props = defineProps<{
   editorView: EditorView
@@ -12,9 +12,13 @@ const showSearchTab = ref(false)
 const searchInputRef = ref<{ focus: () => void, select: () => void } | null>(null)
 
 const searchWord = ref(``)
+const isRegex = ref(false)
+const isCaseSensitive = ref(false)
+const findInSelection = ref(false)
 const indexOfMatch = ref(0)
 const showReplace = ref(false)
 const replaceWord = ref(``)
+const selectionRange = ref<{ from: number, to: number } | null>(null)
 
 const matchPositions = ref<Array<Array<{ line: number, ch: number }>>>([])
 const numberOfMatches = computed(() => {
@@ -57,7 +61,7 @@ onMounted(() => {
   }
 })
 
-watch(searchWord, () => {
+watch([searchWord, isRegex, isCaseSensitive, findInSelection], () => {
   const debouncedSearch = useDebounceFn(() => {
     matchPositions.value = []
 
@@ -80,13 +84,24 @@ watch([indexOfMatch, matchPositions], () => {
 watch(showSearchTab, async () => {
   if (!showSearchTab.value) {
     clearAllMarks()
+    findInSelection.value = false
+    selectionRange.value = null
   }
   else {
+    // 如果有选中文本，自动启用 find in selection
+    const selection = props.editorView.state.selection.main
+    if (!selection.empty) {
+      findInSelection.value = true
+      selectionRange.value = { from: selection.from, to: selection.to }
+    }
     markMatch()
-    // 等待DOM更新后聚焦输入框
+    // 等待DOM更新后聚焦输入框，但不触发编辑器失焦
     await nextTick()
-    searchInputRef.value?.focus()
-    searchInputRef.value?.select()
+    // 使用 setTimeout 确保编辑器的选区不会因为输入框聚焦而丢失
+    setTimeout(() => {
+      searchInputRef.value?.focus()
+      searchInputRef.value?.select()
+    }, 0)
   }
 })
 
@@ -141,26 +156,68 @@ function findAllMatches() {
   if (!searchWord.value || !showSearchTab.value)
     return
 
-  // 使用 v6 的方式搜索文本
-  const content = props.editorView.state.doc.toString()
+  // 确定搜索范围
+  let searchFrom = 0
+  let searchTo = props.editorView.state.doc.length
+  if (findInSelection.value && selectionRange.value) {
+    searchFrom = selectionRange.value.from
+    searchTo = selectionRange.value.to
+  }
+
+  const content = props.editorView.state.sliceDoc(searchFrom, searchTo)
   const searchTerm = searchWord.value
   const _matchPositions: Array<Array<{ line: number, ch: number }>> = []
 
   if (searchTerm) {
-    const lines = content.split(`\n`)
-    lines.forEach((line, lineIndex) => {
-      let startIndex = 0
-      let index = line.toLowerCase().indexOf(searchTerm.toLowerCase(), startIndex)
+    if (isRegex.value) {
+      try {
+        const flags = `gm${isCaseSensitive.value ? `` : `i`}`
+        const regex = new RegExp(searchTerm, flags)
+        let match
+        // eslint-disable-next-line no-cond-assign
+        while ((match = regex.exec(content)) !== null) {
+          if (match[0].length === 0) {
+            regex.lastIndex++
+            continue
+          }
+          const startPos = match.index + searchFrom
+          const endPos = match.index + match[0].length + searchFrom
 
-      while (index !== -1) {
-        _matchPositions.push([
-          { line: lineIndex, ch: index },
-          { line: lineIndex, ch: index + searchTerm.length },
-        ])
-        startIndex = index + 1
-        index = line.toLowerCase().indexOf(searchTerm.toLowerCase(), startIndex)
+          const startLineObj = props.editorView.state.doc.lineAt(startPos)
+          const endLineObj = props.editorView.state.doc.lineAt(endPos)
+
+          _matchPositions.push([
+            { line: startLineObj.number - 1, ch: startPos - startLineObj.from },
+            { line: endLineObj.number - 1, ch: endPos - endLineObj.from },
+          ])
+        }
       }
-    })
+      catch (e) {
+        console.warn(`Invalid Regex`, e)
+      }
+    }
+    else {
+      const lines = content.split(`\n`)
+      const searchTermForCompare = isCaseSensitive.value ? searchTerm : searchTerm.toLowerCase()
+
+      lines.forEach((line, lineIndex) => {
+        const lineForCompare = isCaseSensitive.value ? line : line.toLowerCase()
+        let startIndex = 0
+        let index = lineForCompare.indexOf(searchTermForCompare, startIndex)
+
+        while (index !== -1) {
+          const actualLineObj = props.editorView.state.doc.lineAt(searchFrom)
+          const actualLineNumber = actualLineObj.number - 1 + lineIndex
+
+          _matchPositions.push([
+            { line: actualLineNumber, ch: index },
+            { line: actualLineNumber, ch: index + searchTerm.length },
+          ])
+          startIndex = index + 1
+          index = lineForCompare.indexOf(searchTermForCompare, startIndex)
+        }
+      })
+    }
   }
 
   matchPositions.value = _matchPositions
@@ -182,6 +239,33 @@ function prevMatch() {
 
 function toggleShowReplace() {
   showReplace.value = !showReplace.value
+}
+
+function toggleRegex() {
+  isRegex.value = !isRegex.value
+}
+
+function toggleCaseSensitive() {
+  isCaseSensitive.value = !isCaseSensitive.value
+}
+
+function toggleFindInSelection() {
+  if (!findInSelection.value) {
+    // 启用时，保存当前选区
+    const selection = props.editorView.state.selection.main
+    if (!selection.empty) {
+      selectionRange.value = { from: selection.from, to: selection.to }
+    }
+    else {
+      // 如果没有选区，使用整个文档
+      selectionRange.value = { from: 0, to: props.editorView.state.doc.length }
+    }
+  }
+  else {
+    // 禁用时，清除选区
+    selectionRange.value = null
+  }
+  findInSelection.value = !findInSelection.value
 }
 
 function closeSearchTab() {
@@ -217,9 +301,20 @@ function handleReplace() {
   const fromPos = fromLine.from + from.ch
   const toPos = toLine.from + to.ch
 
+  let insertText = replaceWord.value
+  if (isRegex.value) {
+    try {
+      const matchedText = props.editorView.state.sliceDoc(fromPos, toPos)
+      insertText = matchedText.replace(new RegExp(searchWord.value, `gm`), replaceWord.value)
+    }
+    catch (e) {
+      console.warn(`Invalid Regex Replacement`, e)
+    }
+  }
+
   props.editorView.dispatch({
-    changes: { from: fromPos, to: toPos, insert: replaceWord.value },
-    selection: { anchor: fromPos + replaceWord.value.length },
+    changes: { from: fromPos, to: toPos, insert: insertText },
+    selection: { anchor: fromPos + insertText.length },
   })
   findAllMatches()
 }
@@ -246,7 +341,18 @@ function handleReplaceAll() {
     const fromPos = fromLine.from + from.ch
     const toPos = toLine.from + to.ch
 
-    return { from: fromPos, to: toPos, insert: replaceWord.value }
+    let insertText = replaceWord.value
+    if (isRegex.value) {
+      try {
+        const matchedText = props.editorView.state.sliceDoc(fromPos, toPos)
+        insertText = matchedText.replace(new RegExp(searchWord.value, `gm`), replaceWord.value)
+      }
+      catch (e) {
+        console.warn(`Invalid Regex Replacement`, e)
+      }
+    }
+
+    return { from: fromPos, to: toPos, insert: insertText }
   })
 
   props.editorView.dispatch({ changes })
@@ -264,10 +370,10 @@ function setSearchWord(word: string) {
     showSearchTab.value = true
   }
   else {
-    nextTick(() => {
+    setTimeout(() => {
       searchInputRef.value?.focus()
       searchInputRef.value?.select()
-    })
+    }, 0)
   }
 }
 
@@ -281,10 +387,10 @@ function setSearchWithReplace(word: string) {
     showSearchTab.value = true
   }
   else {
-    nextTick(() => {
+    setTimeout(() => {
       searchInputRef.value?.focus()
       searchInputRef.value?.select()
-    })
+    }, 0)
   }
 }
 
@@ -340,6 +446,39 @@ defineExpose({
             class="h-7 w-40 text-sm"
             @keydown="handleSearchInputKeyDown"
           />
+          <Button
+            variant="ghost"
+            size="xs"
+            title="区分大小写"
+            aria-label="区分大小写"
+            class="h-6 w-6 p-0"
+            :class="{ 'bg-accent': isCaseSensitive }"
+            @click="toggleCaseSensitive"
+          >
+            <CaseSensitive class="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            title="正则表达式"
+            aria-label="正则表达式"
+            class="h-6 w-6 p-0"
+            :class="{ 'bg-accent': isRegex }"
+            @click="toggleRegex"
+          >
+            <Regex class="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            title="在选区内查找"
+            aria-label="在选区内查找"
+            class="h-6 w-6 p-0"
+            :class="{ 'bg-accent': findInSelection }"
+            @click="toggleFindInSelection"
+          >
+            <WholeWord class="h-3 w-3" />
+          </Button>
           <span class="w-10 select-none text-center text-xs">
             {{ numberOfMatches ? indexOfMatch + 1 : 0 }}/{{ numberOfMatches }}
           </span>

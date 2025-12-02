@@ -4,10 +4,13 @@ import { altSign, ctrlSign, shiftSign } from '@md/shared/configs'
 import { redoAction, undoAction } from '@md/shared/editor'
 import {
   ClipboardPaste,
+  Contact,
   Copy,
+  Image,
   Redo2,
   Replace,
   Search,
+  Table,
   Undo2,
   WandSparkles,
 } from 'lucide-vue-next'
@@ -21,6 +24,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   asSub: false,
 })
+
+const emit = defineEmits(['copy'])
 
 const { asSub } = toRefs(props)
 
@@ -135,14 +140,37 @@ function openReplace() {
       <MenubarSeparator />
 
       <!-- 剪贴板操作 -->
-      <MenubarItem @click="copyToClipboard()">
-        <Copy class="mr-2 h-4 w-4" />
-        复制
-        <MenubarShortcut>
-          <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">{{ ctrlSign }}</kbd>
-          <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">C</kbd>
-        </MenubarShortcut>
-      </MenubarItem>
+      <MenubarSub>
+        <MenubarSubTrigger>
+          <Copy class="mr-2 h-4 w-4" />
+          复制
+        </MenubarSubTrigger>
+        <MenubarSubContent>
+          <MenubarItem @click="emit('copy', 'txt')">
+            公众号格式
+          </MenubarItem>
+          <MenubarItem @click="emit('copy', 'html')">
+            HTML 格式
+          </MenubarItem>
+          <MenubarItem @click="emit('copy', 'html-without-style')">
+            HTML 格式（无样式）
+          </MenubarItem>
+          <MenubarItem @click="emit('copy', 'html-and-style')">
+            HTML 格式（兼容样式）
+          </MenubarItem>
+          <MenubarItem @click="emit('copy', 'md')">
+            MD 格式
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem @click="copyToClipboard()">
+            复制选中内容
+            <MenubarShortcut>
+              <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">{{ ctrlSign }}</kbd>
+              <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">C</kbd>
+            </MenubarShortcut>
+          </MenubarItem>
+        </MenubarSubContent>
+      </MenubarSub>
       <MenubarItem @click="pasteFromClipboard()">
         <ClipboardPaste class="mr-2 h-4 w-4" />
         粘贴
@@ -184,6 +212,32 @@ function openReplace() {
           <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">H</kbd>
         </MenubarShortcut>
       </MenubarItem>
+
+      <MenubarSeparator />
+
+      <MenubarSub>
+        <MenubarSubTrigger>
+          插入
+        </MenubarSubTrigger>
+        <MenubarSubContent class="w-52">
+          <MenubarItem @click="uiStore.toggleAIImageDialog(true)">
+            <WandSparkles class="mr-2 h-4 w-4" />
+            文生图
+          </MenubarItem>
+          <MenubarItem @click="uiStore.toggleShowUploadImgDialog()">
+            <Image class="mr-2 h-4 w-4" />
+            插入图片
+          </MenubarItem>
+          <MenubarItem @click="uiStore.toggleShowInsertFormDialog()">
+            <Table class="mr-2 h-4 w-4" />
+            插入表格
+          </MenubarItem>
+          <MenubarItem @click="uiStore.toggleShowInsertMpCardDialog()">
+            <Contact class="mr-2 h-4 w-4" />
+            公众号名片
+          </MenubarItem>
+        </MenubarSubContent>
+      </MenubarSub>
     </MenubarSubContent>
   </MenubarSub>
 
@@ -214,14 +268,37 @@ function openReplace() {
       <MenubarSeparator />
 
       <!-- 剪贴板操作 -->
-      <MenubarItem @click="copyToClipboard()">
-        <Copy class="mr-2 h-4 w-4" />
-        复制
-        <MenubarShortcut>
-          <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">{{ ctrlSign }}</kbd>
-          <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">C</kbd>
-        </MenubarShortcut>
-      </MenubarItem>
+      <MenubarSub>
+        <MenubarSubTrigger>
+          <Copy class="mr-2 h-4 w-4" />
+          复制
+        </MenubarSubTrigger>
+        <MenubarSubContent>
+          <MenubarItem @click="emit('copy', 'txt')">
+            公众号格式
+          </MenubarItem>
+          <MenubarItem @click="emit('copy', 'html')">
+            HTML 格式
+          </MenubarItem>
+          <MenubarItem @click="emit('copy', 'html-without-style')">
+            HTML 格式（无样式）
+          </MenubarItem>
+          <MenubarItem @click="emit('copy', 'html-and-style')">
+            HTML 格式（兼容样式）
+          </MenubarItem>
+          <MenubarItem @click="emit('copy', 'md')">
+            MD 格式
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem @click="copyToClipboard()">
+            复制选中内容
+            <MenubarShortcut>
+              <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">{{ ctrlSign }}</kbd>
+              <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">C</kbd>
+            </MenubarShortcut>
+          </MenubarItem>
+        </MenubarSubContent>
+      </MenubarSub>
       <MenubarItem @click="pasteFromClipboard()">
         <ClipboardPaste class="mr-2 h-4 w-4" />
         粘贴
@@ -263,6 +340,32 @@ function openReplace() {
           <kbd class="mx-1 bg-gray-2 dark:bg-stone-9">H</kbd>
         </MenubarShortcut>
       </MenubarItem>
+
+      <MenubarSeparator />
+
+      <MenubarSub>
+        <MenubarSubTrigger>
+          插入
+        </MenubarSubTrigger>
+        <MenubarSubContent class="w-52">
+          <MenubarItem @click="uiStore.toggleAIImageDialog(true)">
+            <WandSparkles class="mr-2 h-4 w-4" />
+            文生图
+          </MenubarItem>
+          <MenubarItem @click="uiStore.toggleShowUploadImgDialog()">
+            <Image class="mr-2 h-4 w-4" />
+            插入图片
+          </MenubarItem>
+          <MenubarItem @click="uiStore.toggleShowInsertFormDialog()">
+            <Table class="mr-2 h-4 w-4" />
+            插入表格
+          </MenubarItem>
+          <MenubarItem @click="uiStore.toggleShowInsertMpCardDialog()">
+            <Contact class="mr-2 h-4 w-4" />
+            公众号名片
+          </MenubarItem>
+        </MenubarSubContent>
+      </MenubarSub>
     </MenubarContent>
   </MenubarMenu>
 </template>
