@@ -257,11 +257,6 @@ function handleCopy(mode: string) {
   copyMode.value = mode
   copy()
 }
-
-function copyToWeChat() {
-  copyMode.value = 'txt'
-  copy()
-}
 </script>
 
 <template>

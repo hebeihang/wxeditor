@@ -135,6 +135,11 @@ const summarizeCompressionValue = ref<number>(30)
 const summarizePreserveKeyPoints = ref(true)
 const summarizeExplainOmissions = ref(false)
 
+const outlineStyleId = ref<string>('')
+const outlineLevels = ref<number>(2)
+const outlineTargetSections = ref<number>(6)
+const includeParagraphSamples = ref<boolean>(false)
+
 const grammarAutoFix = ref<'建议并标注' | '直接替换' | '仅标注'>('建议并标注')
 const grammarShowInlineAnnotations = ref(true)
 const grammarLanguage = ref<'auto' | 'zh-CN' | 'en' | 'ja' | 'ko'>('auto')
@@ -537,8 +542,7 @@ function buildActionPrompt(inputText: string): string {
       const polishToneId = kvStore.reactive<string>('ai_tone_id', '')
       const preserveNames = kvStore.reactive<boolean>('ai_preserve_names', true)
       const polishStrength = kvStore.reactive<number>('ai_polish_strength', 60)
-      const lengthPref = kvStore.reactive<string>('ai_polish_length_pref', '保持长度')
-      const structureOpt = kvStore.reactive<string>('ai_polish_structure_opt', 'none')
+
       const readability = kvStore.reactive<string>('ai_polish_readability_level', '大众读者（高中）')
       const custom = kvStore.reactive<string>('ai_polish_custom', '')
 
@@ -548,20 +552,7 @@ function buildActionPrompt(inputText: string): string {
       const tone = getToneLabel(polishToneId.value || 'none')
       const preserve = preserveNames.value ? '保留专有名词（人名、品牌、技术名词、机构名等）原样不改。' : ''
       const strength = `润色强度：${polishStrength.value}/100（强度越高改动越大）。`
-      const lenText = lengthPref.value === '保持长度'
-        ? '整体长度尽量与原文一致。'
-        : lengthPref.value === '不超过原文'
-          ? '整体长度不超过原文，允许少量误差。'
-          : lengthPref.value === '稍微扩写（10-20%）'
-            ? '整体长度比原文扩写约 10-20%。'
-            : lengthPref.value === '适度扩写'
-              ? '整体长度比原文扩写约 20-40%。'
-              : '整体长度比原文扩写约 40-80%。'
-      const structText = structureOpt.value === 'none'
-        ? '不要调整段落结构或逻辑顺序。'
-        : structureOpt.value === 'mild'
-          ? '允许轻微结构优化（可补充过渡句、微调句序）。'
-          : '允许较强结构优化（可重排段落、增强逻辑）。'
+
       const readText = readability.value === '专家读者'
         ? '目标读者：专家读者。可使用专业术语与精炼表达，无需基础解释。'
         : readability.value === '专业读者'

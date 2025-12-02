@@ -73,7 +73,7 @@ watch(aiImagePrefillPrompt, (val) => {
 
 /* ---------- AI 配置 ---------- */
 const AIImageConfigStore = useAIImageConfigStore()
-const { apiKey, endpoint, model, type, size, quality, style, stylePreset, resolution, composition, mood, color_tone, lighting, detail_level, negative_prompt, num_images, seed, prompt_enhancement, safety_level, allow_style_reference, character_consistency, custom_instruction } = storeToRefs(AIImageConfigStore)
+const { apiKey, endpoint, model, type, size, quality, style, stylePreset, composition, mood, color_tone, lighting, detail_level, negative_prompt, num_images, seed, prompt_enhancement, character_consistency, custom_instruction } = storeToRefs(AIImageConfigStore)
 
 /* ---------- 过期检查函数 ---------- */
 function isImageExpired(timestamp: number): boolean {
