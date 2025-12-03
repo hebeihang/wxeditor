@@ -339,21 +339,6 @@ function resetState() {
   forceTranslate.value = false
 }
 
-async function onGlossaryUpload(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file)
-    return
-  const text = await file.text()
-  try {
-    JSON.parse(text)
-    translateTerminology.value = text
-  }
-  catch {
-    // ignore invalid JSON
-  }
-}
-
 /* -------------------- AI call -------------------- */
 async function runAIAction() {
   let text = currentText.value.trim()
