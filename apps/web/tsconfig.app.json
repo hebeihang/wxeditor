@@ -10,8 +10,8 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.vue",
-    "components.d.ts",
-    "auto-imports.d.ts",
+    "./auto-imports.d.ts",
+    "./components.d.ts",
     "./.wxt/wxt.d.ts"
   ]
 }
