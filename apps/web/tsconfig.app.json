@@ -14,5 +14,5 @@
     "./components.d.ts",
     "./.wxt/wxt.d.ts"
   ],
-  "exclude": ["src/entrypoints/**/*"]
+  "exclude": ["src/entrypoints/**/*", "src/sidepanel.ts"]
 }

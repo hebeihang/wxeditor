@@ -96,11 +96,11 @@ function exportEditorContent2PDF() {
             Markdown 文件
           </MenubarItem>
           <MenubarSeparator />
-          <MenubarItem @click="exportEditorContent2DOCX()">
+          <!-- <MenubarItem @click="exportEditorContent2DOCX()">
             <FileText class="mr-2 size-4" />
             Word 文档（.docx）
           </MenubarItem>
-          <MenubarSeparator />
+          <MenubarSeparator /> -->
           <MenubarItem @click="exportEditorContent2HTML()">
             <FileCode class="mr-2 size-4" />
             HTML 文件
