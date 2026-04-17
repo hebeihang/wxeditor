@@ -17,7 +17,7 @@ const toolBoxVisible = ref(false)
 const presetAction = ref<
   `optimize` | `expand` | `connect` | `summarize` | `grammar` | `continue` | `outline`
 >(`optimize`)
-const popoverRef = useTemplateRef<InstanceType<typeof AIPolishPopover>>('popoverRef')
+// const popoverRef = useTemplateRef<InstanceType<typeof AIPolishPopover>>('popoverRef')
 const aiHideConnect = kvStore.reactive<boolean>('ai_hide_connect', true)
 const aiHideGrammar = kvStore.reactive<boolean>('ai_hide_grammar', true)
 const aiHideContinue = kvStore.reactive<boolean>('ai_hide_continue', true)
@@ -126,7 +126,6 @@ function openOutline() {
       <Separator orientation="vertical" class="mx-1 h-5" />
 
       <AIPolishPopover
-        ref="popoverRef"
         v-model:open="toolBoxVisible"
         :selected-text="currentSelectedText"
         :is-mobile="isMobile"

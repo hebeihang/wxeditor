@@ -50,9 +50,9 @@ function exportEditorContent2PDF() {
   exportStore.exportEditorContent2PDF()
 }
 
-function exportEditorContent2DOCX() {
-  exportStore.exportEditorContent2DOCX()
-}
+// function exportEditorContent2DOCX() {
+//   exportStore.exportEditorContent2DOCX()
+// }
 </script>
 
 <template>
