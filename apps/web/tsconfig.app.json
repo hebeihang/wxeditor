@@ -13,5 +13,6 @@
     "./auto-imports.d.ts",
     "./components.d.ts",
     "./.wxt/wxt.d.ts"
-  ]
+  ],
+  "exclude": ["src/entrypoints/**/*"]
 }
