@@ -1,11 +1,22 @@
 import type { IOpts, RendererAPI } from '@md/shared/types'
+import type { ReadTimeResults } from '@md/shared/utils/readingTime'
 import type { RendererObject, Tokens } from 'marked'
-import type { ReadTimeResults } from 'reading-time'
+import readingTime from '@md/shared/utils/readingTime'
 import frontMatter from 'front-matter'
 import hljs from 'highlight.js/lib/core'
 import { marked } from 'marked'
-import readingTime from 'reading-time'
-import { markedAlert, markedFootnotes, markedMarkup, markedPlantUML, markedRuby, markedSlider, markedToc, MDKatex } from '../extensions'
+import {
+  markedAlert,
+  markedFootnotes,
+  markedInfographic,
+  markedMarkup,
+  markedMermaid,
+  markedPlantUML,
+  markedRuby,
+  markedSlider,
+  markedToc,
+  MDKatex,
+} from '../extensions'
 import { COMMON_LANGUAGES, highlightAndFormatCode } from '../utils/languages'
 
 Object.entries(COMMON_LANGUAGES).forEach(([name, lang]) => {
@@ -19,14 +30,25 @@ marked.setOptions({
 })
 marked.use(markedSlider())
 
+const AMPERSAND_REGEX = /&/g
+const LESS_THAN_REGEX = /</g
+const GREATER_THAN_REGEX = />/g
+const DOUBLE_QUOTE_REGEX = /"/g
+const SINGLE_QUOTE_REGEX = /'/g
+const BACKTICK_REGEX = /`/g
+const UNDERSCORE_REGEX = /_/g
+const HEADING_TAG_REGEX = /^h\d$/
+const PARAGRAPH_WRAPPER_REGEX = /^<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/
+const MP_WEIXIN_LINK_REGEX = /^https?:\/\/mp\.weixin\.qq\.com/
+
 function escapeHtml(text: string): string {
   return text
-    .replace(/&/g, `&amp;`) // 转义 &
-    .replace(/</g, `&lt;`) // 转义 <
-    .replace(/>/g, `&gt;`) // 转义 >
-    .replace(/"/g, `&quot;`) // 转义 "
-    .replace(/'/g, `&#39;`) // 转义 '
-    .replace(/`/g, `&#96;`) // 转义 `
+    .replace(AMPERSAND_REGEX, `&amp;`) // 转义 &
+    .replace(LESS_THAN_REGEX, `&lt;`) // 转义 <
+    .replace(GREATER_THAN_REGEX, `&gt;`) // 转义 >
+    .replace(DOUBLE_QUOTE_REGEX, `&quot;`) // 转义 "
+    .replace(SINGLE_QUOTE_REGEX, `&#39;`) // 转义 '
+    .replace(BACKTICK_REGEX, `&#96;`) // 转义 `
 }
 
 function buildAddition(): string {
@@ -58,7 +80,22 @@ function buildFootnoteArray(footnotes: [number, string, string][]): string {
     .join(`\n`)
 }
 
-function transform(legend: string, text: string | null, title: string | null): string {
+function extractFileName(href: string): string {
+  try {
+    // 移除查询参数和哈希
+    const urlPath = href.split('?')[0].split('#')[0]
+    // 获取最后一个 / 之后的部分
+    const fileName = urlPath.split('/').pop() || ''
+    // 移除文件扩展名
+    const nameWithoutExt = fileName.replace(/\.[^.]*$/, '')
+    return nameWithoutExt
+  }
+  catch {
+    return ''
+  }
+}
+
+function transform(legend: string, text: string | null, title: string | null, href: string = ''): string {
   const options = legend.split(`-`)
   for (const option of options) {
     if (option === `alt` && text) {
@@ -66,6 +103,12 @@ function transform(legend: string, text: string | null, title: string | null): s
     }
     if (option === `title` && title) {
       return title
+    }
+    if (option === `filename` && href) {
+      const fileName = extractFileName(href)
+      if (fileName) {
+        return escapeHtml(fileName)
+      }
     }
   }
   return ``
@@ -112,7 +155,6 @@ function parseFrontMatterAndContent(markdownText: string): ParseResult {
 export function initRenderer(opts: IOpts = {}): RendererAPI {
   const footnotes: [number, string, string][] = []
   let footnoteIndex: number = 0
-  let codeIndex: number = 0
   const listOrderedStack: boolean[] = []
   const listCounters: number[] = []
 
@@ -125,12 +167,14 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
    * @param styleLabel CSS 类名标识
    * @param content 内容
    * @param tagName HTML 标签名（可选）
+   * @param style 内联样式（可选）
    */
-  function styledContent(styleLabel: string, content: string, tagName?: string): string {
+  function styledContent(styleLabel: string, content: string, tagName?: string, style?: string): string {
     const tag = tagName ?? styleLabel
-    const className = `${styleLabel.replace(/_/g, `-`)}`
-    const headingAttr = /^h\d$/.test(tag) ? ` data-heading="true"` : ``
-    return `<${tag} class="${className}"${headingAttr}>${content}</${tag}>`
+    const className = `${styleLabel.replace(UNDERSCORE_REGEX, `-`)}`
+    const headingAttr = HEADING_TAG_REGEX.test(tag) ? ` data-heading="true"` : ``
+    const styleAttr = style ? ` style="${style}"` : ``
+    return `<${tag} class="${className}"${headingAttr}${styleAttr}>${content}</${tag}>`
   }
 
   function addFootnote(title: string, link: string): number {
@@ -153,10 +197,7 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
 
   function setOptions(newOpts: Partial<IOpts>): void {
     opts = { ...opts, ...newOpts }
-    // 新主题系统：扩展不再需要 styles 参数
-    marked.use(markedAlert())
-    marked.use(MDKatex({ nonStandard: true }, true))
-    marked.use(markedMarkup())
+    marked.use(markedInfographic({ themeMode: newOpts.themeMode }))
   }
 
   function buildReadingTime(readingTime: ReadTimeResults): string {
@@ -208,22 +249,6 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
     },
 
     code({ text, lang = `` }: Tokens.Code): string {
-      if (lang.startsWith(`mermaid`)) {
-        clearTimeout(codeIndex)
-        codeIndex = setTimeout(async () => {
-          // 优先使用全局 CDN 的 mermaid
-          if (typeof window !== `undefined` && (window as any).mermaid) {
-            const mermaid = (window as any).mermaid
-            await mermaid.run()
-          }
-          else {
-            // 回退到动态导入（开发环境）
-            const mermaid = await import(`mermaid`)
-            await mermaid.default.run()
-          }
-        }, 0) as any as number
-        return `<pre class="mermaid">${text}</pre>`
-      }
       const langText = lang.split(` `)[0]
       const isLanguageRegistered = hljs.getLanguage(langText)
       const language = isLanguageRegistered ? langText : `plaintext`
@@ -234,7 +259,7 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
       // 如果语言未注册，添加 data-language-pending 属性和原始代码文本用于后续动态加载
       let pendingAttr = ``
       if (!isLanguageRegistered && langText !== `plaintext`) {
-        const escapedText = text.replace(/"/g, `&quot;`)
+        const escapedText = text.replace(DOUBLE_QUOTE_REGEX, `&quot;`)
         pendingAttr = ` data-language-pending="${langText}" data-raw-code="${escapedText}" data-show-line-number="${opts.isShowLineNumber}"`
       }
       const code = `<code class="language-${lang}"${pendingAttr}>${highlighted}</code>`
@@ -284,7 +309,7 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
       catch {
         content = this.parser
           .parse(token.tokens)
-          .replace(/^<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/, `$1`)
+          .replace(PARAGRAPH_WRAPPER_REGEX, `$1`)
       }
 
       return styledContent(
@@ -295,14 +320,15 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
     },
 
     image({ href, title, text }: Tokens.Image): string {
-      const subText = styledContent(`figcaption`, transform(opts.legend!, text, title))
+      const newText = opts.legend ? transform(opts.legend, text, title, href) : ``
+      const subText = newText ? styledContent(`figcaption`, newText) : ``
       const titleAttr = title ? ` title="${title}"` : ``
       return `<figure><img src="${href}"${titleAttr} alt="${text}"/>${subText}</figure>`
     },
 
     link({ href, title, text, tokens }: Tokens.Link): string {
       const parsedText = this.parser.parseInline(tokens)
-      if (/^https?:\/\/mp\.weixin\.qq\.com/.test(href)) {
+      if (MP_WEIXIN_LINK_REGEX.test(href)) {
         return `<a href="${href}" title="${title || text}">${parsedText}</a>`
       }
       if (href === text) {
@@ -327,7 +353,7 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
       const headerRow = header
         .map((cell) => {
           const text = this.parser.parseInline(cell.tokens)
-          return styledContent(`th`, text)
+          return styledContent(`th`, text, undefined, `text-align: ${cell.align || `left`}`)
         })
         .join(``)
       const body = rows
@@ -339,7 +365,7 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
         })
         .join(``)
       return `
-        <section style="max-width: 100%; overflow: auto">
+        <section style="max-width: 100%; overflow: auto; -webkit-overflow-scrolling: touch">
           <table class="preview-table">
             <thead>${headerRow}</thead>
             <tbody>${body}</tbody>
@@ -350,11 +376,19 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
 
     tablecell(token: Tokens.TableCell): string {
       const text = this.parser.parseInline(token.tokens)
-      return styledContent(`td`, text)
+      return styledContent(`td`, text, undefined, `text-align: ${token.align || `left`}`)
     },
 
-    hr(_: Tokens.Hr): string {
-      return styledContent(`hr`, ``)
+    hr(token: Tokens.Hr): string {
+      const raw = token.raw.trim()
+      let variant = `dash`
+      if (raw.includes(`*`)) {
+        variant = `star`
+      }
+      else if (raw.includes(`_`)) {
+        variant = `underscore`
+      }
+      return `<hr class="hr hr-${variant}">`
     },
   }
 
@@ -366,9 +400,11 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
   marked.use(markedAlert({}))
   marked.use(MDKatex({ nonStandard: true }, true))
   marked.use(markedFootnotes())
+  marked.use(markedMermaid())
   marked.use(markedPlantUML({
     inlineSvg: true, // 启用SVG内嵌，适用于微信公众号
   }))
+  marked.use(markedInfographic({ themeMode: opts.themeMode }))
   marked.use(markedRuby())
 
   return {

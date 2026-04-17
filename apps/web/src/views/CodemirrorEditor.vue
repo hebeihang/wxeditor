@@ -6,15 +6,16 @@ import { EditorView } from '@codemirror/view'
 import { highlightPendingBlocks, hljs } from '@md/core'
 import { markdownSetup, theme } from '@md/shared/editor'
 import imageCompression from 'browser-image-compression'
-import { Eye, Pen } from 'lucide-vue-next'
 import { SidebarAIToolbar } from '@/components/ai'
 import TitleBar from '@/components/editor/TitleBar.vue'
+import FolderSourcePanel from '@/components/editor/FolderSourcePanel.vue'
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
 import { SearchTab } from '@/components/ui/search-tab'
+import { useImageUploader } from '@/composables/useImageUploader'
 import { useCssEditorStore } from '@/stores/cssEditor'
 import { useEditorStore } from '@/stores/editor'
 import { usePostStore } from '@/stores/post'
@@ -31,18 +32,21 @@ const renderStore = useRenderStore()
 const themeStore = useThemeStore()
 const uiStore = useUIStore()
 const cssEditorStore = useCssEditorStore()
+const { upload } = useImageUploader()
 
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { isDark } = storeToRefs(uiStore)
 const { posts, currentPostIndex } = storeToRefs(postStore)
-const { previewWidth } = storeToRefs(themeStore)
 const {
   isMobile,
-  isEditOnLeft,
   isOpenPostSlider,
+  isOpenFolderPanel,
   isOpenRightSlider,
   isOpenConfirmDialog,
+  enableImageReupload,
+  viewMode,
+  previewDevice,
 } = storeToRefs(uiStore)
 
 const { toggleShowUploadImgDialog } = uiStore
@@ -52,15 +56,7 @@ function editorRefresh() {
   themeStore.updateCodeTheme()
 
   const raw = editorStore.getContent()
-  renderStore.render(raw, {
-    isCiteStatus: themeStore.isCiteStatus,
-    legend: themeStore.legend,
-    isUseIndent: themeStore.isUseIndent,
-    isUseJustify: themeStore.isUseJustify,
-    isCountStatus: themeStore.isCountStatus,
-    isMacCodeBlock: themeStore.isMacCodeBlock,
-    isShowLineNumber: themeStore.isShowLineNumber,
-  })
+  renderStore.render(raw)
 }
 
 // Reset style function
@@ -85,12 +81,6 @@ watch(output, () => {
 const backLight = ref(false)
 const isCoping = ref(false)
 
-// 辅助函数：查找 CodeMirror 滚动容器
-function findCodeMirrorScroller(): HTMLElement | null {
-  return document.querySelector<HTMLElement>(`.cm-scroller`)
-    || document.querySelector<HTMLElement>(`.CodeMirror-scroll`)
-}
-
 function startCopy() {
   backLight.value = true
   isCoping.value = true
@@ -104,98 +94,308 @@ function endCopy() {
   }, 800)
 }
 
-const showEditor = ref(true)
+const showEditor = computed(() => viewMode.value !== `preview`)
 
-// 切换编辑/预览视图（仅限移动端）
-function toggleView() {
-  showEditor.value = !showEditor.value
-}
+// 是否有侧面板打开（样式面板 / CSS编辑器）
+const hasSidePanel = computed(() => !isMobile.value && (isOpenRightSlider.value || uiStore.isShowCssEditor))
+
+// 编辑器面板尺寸配置
+const editorPanelConfig = computed(() => {
+  const mode = viewMode.value
+  if (mode === `preview`) {
+    return { min: 0, max: 0 }
+  }
+  if (mode === `edit`) {
+    return hasSidePanel.value ? { min: 30, max: 85 } : { min: 100, max: 100 }
+  }
+  // split
+  if (isMobile.value)
+    return { min: 30, max: 70 }
+  return { min: 15, max: 85 }
+})
+
+// 预览面板尺寸配置
+const previewPanelConfig = computed(() => {
+  const mode = viewMode.value
+  if (mode === `edit`) {
+    return { min: 0, max: 0 }
+  }
+  if (mode === `preview`) {
+    return hasSidePanel.value ? { min: 20, max: 75 } : { min: 100, max: 100 }
+  }
+  // split
+  if (isMobile.value)
+    return { min: 30, max: 70 }
+  return { min: 15, max: 85 }
+})
+
+// 编辑器/预览面板引用（用于 collapse/expand）
+const editorPanelRef = ref<InstanceType<typeof ResizablePanel> | null>(null)
+const previewPanelRef = ref<InstanceType<typeof ResizablePanel> | null>(null)
+
+// 监听 viewMode 变化，编程式调整面板大小
+watch(viewMode, (mode) => {
+  nextTick(() => {
+    if (mode === `edit`) {
+      // 编辑模式：编辑器占满，预览折叠
+      editorPanelRef.value?.resize(hasSidePanel.value ? 60 : 100)
+      previewPanelRef.value?.resize(0)
+    }
+    else if (mode === `preview`) {
+      // 预览模式：预览占满，编辑器折叠
+      editorPanelRef.value?.resize(0)
+      previewPanelRef.value?.resize(hasSidePanel.value ? 60 : 100)
+    }
+    else {
+      // 双屏模式：各占一半
+      editorPanelRef.value?.resize(50)
+      previewPanelRef.value?.resize(50)
+    }
+  })
+})
+
+// 监听侧面板变化，在单屏模式下需重新分配空间
+watch(hasSidePanel, (has) => {
+  nextTick(() => {
+    const mode = viewMode.value
+    if (mode === `edit`) {
+      editorPanelRef.value?.resize(has ? 60 : 100)
+    }
+    else if (mode === `preview`) {
+      previewPanelRef.value?.resize(has ? 60 : 100)
+    }
+  })
+})
+
+// 预览区域宽度样式（受设备切换影响）
+const effectivePreviewWidth = computed(() => {
+  if (isMobile.value)
+    return `w-full`
+  return previewDevice.value === `mobile` ? `w-[375px]` : `w-full`
+})
 
 // AI 工具箱已移到侧边栏
 
 const previewRef = useTemplateRef<HTMLDivElement>(`previewRef`)
 
-const timeout = ref<NodeJS.Timeout>()
 const codeMirrorView = ref<EditorView | null>(null)
 const themeCompartment = new Compartment()
+const cursorSyncTimer = ref<NodeJS.Timeout>()
+const skipCursorDrivenPreviewSync = ref(false)
 
-// 使浏览区与编辑区滚动条建立同步联系
-function leftAndRightScroll() {
-  const scrollCB = (text: string) => {
-    // AIPolishBtnRef.value?.close()
+function normalizeText(text: string) {
+  return text
+    .replace(/\s+/g, ` `)
+    .trim()
+}
 
-    let source: HTMLElement | null
-    let target: HTMLElement | null
-
-    clearTimeout(timeout.value)
-    if (text === `preview`) {
-      source = previewRef.value!
-      target = findCodeMirrorScroller()
-      if (!target) {
-        console.warn(`Cannot find CodeMirror scroll container`)
-        return
-      }
-      // CodeMirror v6 使用 DOM 事件
-      const scrollEl = findCodeMirrorScroller()
-      if (scrollEl) {
-        scrollEl.removeEventListener(`scroll`, editorScrollCB)
-        timeout.value = setTimeout(() => {
-          scrollEl.addEventListener(`scroll`, editorScrollCB)
-        }, 300)
-      }
-    }
-    else {
-      source = findCodeMirrorScroller()
-      target = previewRef.value!
-      if (!source) {
-        console.warn(`Cannot find CodeMirror scroll container`)
-        return
-      }
-      target.removeEventListener(`scroll`, previewScrollCB, false)
-      timeout.value = setTimeout(() => {
-        target!.addEventListener(`scroll`, previewScrollCB, false)
-      }, 300)
-    }
-
-    if (!source || !target) {
-      return
-    }
-
-    const sourceHeight = source.scrollHeight - source.offsetHeight
-    const targetHeight = target.scrollHeight - target.offsetHeight
-
-    if (sourceHeight <= 0 || targetHeight <= 0) {
-      return
-    }
-
-    const percentage = source.scrollTop / sourceHeight
-    const height = percentage * targetHeight
-
-    target.scrollTo(0, height)
+function parseMarkdownHeadingLine(line: string): { level: number, title: string } | null {
+  if (!line.startsWith(`#`)) {
+    return null
   }
 
-  function editorScrollCB() {
-    scrollCB(`editor`)
+  let level = 0
+  while (level < line.length && line[level] === `#` && level < 6) {
+    level++
   }
 
-  function previewScrollCB() {
-    scrollCB(`preview`)
+  if (level === 0 || line[level] !== ` `) {
+    return null
   }
 
-  if (previewRef.value) {
-    previewRef.value.addEventListener(`scroll`, previewScrollCB, false)
+  const title = normalizeText(line.slice(level + 1).replace(/#+\s*$/, ``))
+  if (!title) {
+    return null
   }
-  const scrollEl = findCodeMirrorScroller()
-  if (scrollEl) {
-    scrollEl.addEventListener(`scroll`, editorScrollCB)
+
+  return { level, title }
+}
+
+function scrollPreviewToElement(el: HTMLElement, behavior: ScrollBehavior = `auto`) {
+  const container = previewRef.value
+  if (!container)
+    return
+
+  const cRect = container.getBoundingClientRect()
+  const eRect = el.getBoundingClientRect()
+  const inView = eRect.top >= cRect.top + 32 && eRect.bottom <= cRect.bottom - 32
+
+  if (!inView) {
+    el.scrollIntoView({ behavior, block: `center` })
   }
 }
 
-onMounted(() => {
+function findHeadingElementInPreview(title: string, level?: number) {
+  const headings = document.querySelectorAll<HTMLElement>(`#output [data-heading]`)
+  const normalizedTitle = normalizeText(title)
+
+  for (const heading of headings) {
+    if (level && Number(heading.tagName.slice(1)) !== level)
+      continue
+    if (normalizeText(heading.textContent || ``) === normalizedTitle) {
+      return heading
+    }
+  }
+
+  for (const heading of headings) {
+    if (level && Number(heading.tagName.slice(1)) !== level)
+      continue
+    if (normalizeText(heading.textContent || ``).includes(normalizedTitle)) {
+      return heading
+    }
+  }
+}
+
+function findHeadingPosInEditor(title: string, level?: number) {
+  const view = codeMirrorView.value
+  if (!view)
+    return null
+
+  const doc = view.state.doc
+  const normalizedTitle = normalizeText(title)
+
+  for (let lineNo = 1; lineNo <= doc.lines; lineNo++) {
+    const line = doc.line(lineNo)
+    const parsed = parseMarkdownHeadingLine(line.text)
+    if (!parsed)
+      continue
+
+    if (level && parsed.level !== level)
+      continue
+
+    const headingTitle = parsed.title
+    if (headingTitle === normalizedTitle || headingTitle.includes(normalizedTitle) || normalizedTitle.includes(headingTitle)) {
+      return line.from
+    }
+  }
+
+  return null
+}
+
+function findTextPosInEditor(text: string) {
+  const view = codeMirrorView.value
+  if (!view)
+    return null
+
+  const docText = view.state.doc.toString()
+  const normalized = normalizeText(text)
+  if (!normalized)
+    return null
+
+  const candidates = [
+    normalized,
+    normalized.slice(0, 80),
+    normalized.slice(0, 40),
+    normalized.slice(0, 20),
+  ].filter(item => item.length >= 6)
+
+  for (const candidate of candidates) {
+    const pos = docText.indexOf(candidate)
+    if (pos !== -1) {
+      return pos
+    }
+  }
+
+  return null
+}
+
+function focusEditorAtPos(pos: number) {
+  const view = codeMirrorView.value
+  if (!view)
+    return
+
+  skipCursorDrivenPreviewSync.value = true
+  view.dispatch({
+    selection: { anchor: pos },
+    effects: EditorView.scrollIntoView(pos, { y: `center` }),
+  })
+  view.focus()
+
   setTimeout(() => {
-    leftAndRightScroll()
-  }, 300)
-})
+    skipCursorDrivenPreviewSync.value = false
+  }, 180)
+}
+
+function syncPreviewToEditorCursor() {
+  if (skipCursorDrivenPreviewSync.value)
+    return
+
+  const view = codeMirrorView.value
+  if (!view)
+    return
+
+  const cursorPos = view.state.selection.main.head
+  const doc = view.state.doc
+  const cursorLineNo = doc.lineAt(cursorPos).number
+
+  // 优先按“最近标题”进行语义定位，避免图片/代码块造成的高度失真。
+  for (let lineNo = cursorLineNo; lineNo >= 1; lineNo--) {
+    const text = doc.line(lineNo).text
+    const parsed = parseMarkdownHeadingLine(text)
+    if (!parsed)
+      continue
+
+    const headingEl = findHeadingElementInPreview(parsed.title, parsed.level)
+    if (headingEl) {
+      scrollPreviewToElement(headingEl)
+      return
+    }
+  }
+
+  // 无可用语义锚点时，退化为轻量比例定位。
+  const container = previewRef.value
+  if (!container)
+    return
+  const maxScrollTop = container.scrollHeight - container.offsetHeight
+  const ratio = doc.length > 0 ? cursorPos / doc.length : 0
+  container.scrollTo({ top: Math.max(0, maxScrollTop * ratio), behavior: `auto` })
+}
+
+function scheduleSyncPreviewToEditorCursor() {
+  clearTimeout(cursorSyncTimer.value)
+  cursorSyncTimer.value = setTimeout(() => {
+    syncPreviewToEditorCursor()
+  }, 100)
+}
+
+function syncEditorToPreviewElement(el: HTMLElement) {
+  const tag = el.tagName.toLowerCase()
+  let pos: number | null = null
+
+  if (/^h[1-6]$/.test(tag)) {
+    const level = Number(tag.slice(1))
+    const title = normalizeText(el.textContent || ``)
+    pos = findHeadingPosInEditor(title, level)
+  }
+  else if (tag === `img`) {
+    const img = el as HTMLImageElement
+    const alt = normalizeText(img.alt || ``)
+    pos = alt ? findTextPosInEditor(alt) : null
+    if (pos == null && img.src) {
+      pos = findTextPosInEditor(img.src)
+    }
+  }
+  else {
+    const text = normalizeText(el.textContent || ``)
+    pos = findTextPosInEditor(text)
+  }
+
+  if (pos != null) {
+    focusEditorAtPos(pos)
+  }
+}
+
+function handlePreviewContentClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (!target)
+    return
+
+  const block = target.closest(`h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,td,th,img`) as HTMLElement | null
+  if (!block)
+    return
+
+  syncEditorToPreviewElement(block)
+}
 
 const searchTabRef
   = useTemplateRef<InstanceType<typeof SearchTab>>(`searchTabRef`)
@@ -520,6 +720,131 @@ function createFormTextArea(dom: HTMLDivElement) {
             currentPost.content = value
           }, 300)
         }
+
+        if (update.selectionSet || update.docChanged) {
+          scheduleSyncPreviewToEditorCursor()
+        }
+      }),
+      EditorView.domEventHandlers({
+        paste: (event, view) => {
+          // 1. 处理剪贴板中的文件 (截图/复制文件)
+          if (event.clipboardData?.items && [...event.clipboardData.items].some(item => item.kind === 'file')) {
+            if (isImgLoading.value) {
+              return true
+            }
+            Promise.all(
+              Array.from(event.clipboardData.items, item => item.getAsFile())
+                .filter(item => item != null)
+                .map(async item => (await beforeImageUpload(item!)) ? item : null),
+            ).then((items) => {
+              const validItems = items.filter(item => item != null) as File[]
+              if (validItems.length === 0) {
+                return
+              }
+              // start progress
+              const intervalId = setInterval(() => {
+                const newProgress = progressValue.value + 1
+                if (newProgress >= 100) {
+                  return
+                }
+                progressValue.value = newProgress
+              }, 100)
+
+              const processFiles = async () => {
+                for (const item of validItems) {
+                  await uploadImage(item)
+                }
+                clearInterval(intervalId)
+                progressValue.value = 100
+                setTimeout(() => {
+                  progressValue.value = 0
+                }, 1000)
+              }
+              processFiles()
+            })
+            return true
+          }
+
+          // 2. 处理剪贴板中的文本 (检测 Markdown 图片链接)
+          const text = event.clipboardData?.getData('text/plain')
+          if (text) {
+            // 匹配 ![alt](url) 格式
+            const mdImgRegex = /!\[(.*?)\]\((https?:\/\/[^)]+)\)/g
+            const matches = [...text.matchAll(mdImgRegex)]
+
+            if (matches.length > 0) {
+              isImgLoading.value = true
+
+              // 2.1 插入带有唯一 ID 的占位文本
+              let previewText = text
+              const placeholderMap = new Map<string, { originalUrl: string, originalAlt: string }>()
+
+              // 使用 replace 来生成唯一的占位符
+              let matchIndex = 0
+              previewText = previewText.replace(mdImgRegex, (_, alt, url) => {
+                const id = `LOADING_${Date.now()}_${matchIndex++}`
+                placeholderMap.set(id, { originalUrl: url, originalAlt: alt })
+                return `![⏳ 转存中...](${id})`
+              })
+
+              // 插入占位文本到编辑器
+              view.dispatch(view.state.replaceSelection(previewText))
+
+              // 2.2 提取唯一 URL 进行并发转存
+              const uniqueUrls = [...new Set(matches.map(m => m[2]))]
+
+              // 并发处理
+              Promise.all(uniqueUrls.map(async (url) => {
+                try {
+                  // 根据开关决定是否转存
+                  const newUrl = enableImageReupload.value ? await upload(url) : url
+
+                  // 2.3 转存成功后（或直接使用原URL），精确替换编辑器中的对应内容
+                  // 遍历 map，找到所有 originalUrl 为当前 url 的占位符 ID
+                  for (const [id, info] of placeholderMap.entries()) {
+                    if (info.originalUrl === url) {
+                      // 查找该 ID 在文档中的位置
+                      const searchStr = `![⏳ 转存中...](${id})`
+                      const currentDoc = view.state.doc.toString()
+                      const pos = currentDoc.indexOf(searchStr)
+
+                      if (pos !== -1) {
+                        const newText = `![${info.originalAlt}](${newUrl})`
+                        view.dispatch({
+                          changes: { from: pos, to: pos + searchStr.length, insert: newText },
+                        })
+                      }
+                    }
+                  }
+                }
+                catch (e) {
+                  console.error(`转存失败: ${url}`, e)
+                  // 失败时，将占位符恢复为原样
+                  for (const [id, info] of placeholderMap.entries()) {
+                    if (info.originalUrl === url) {
+                      const searchStr = `![⏳ 转存中...](${id})`
+                      const currentDoc = view.state.doc.toString()
+                      const pos = currentDoc.indexOf(searchStr)
+
+                      if (pos !== -1) {
+                        const newText = `![${info.originalAlt}](${info.originalUrl})`
+                        view.dispatch({
+                          changes: { from: pos, to: pos + searchStr.length, insert: newText },
+                        })
+                      }
+                    }
+                  }
+                  toast.error(`图片转存失败，已保留原链接`)
+                }
+              })).finally(() => {
+                isImgLoading.value = false
+              })
+
+              return true
+            }
+          }
+          return false
+        },
       }),
     ],
   })
@@ -531,45 +856,6 @@ function createFormTextArea(dom: HTMLDivElement) {
   })
 
   codeMirrorView.value = view
-
-  // 添加粘贴事件监听
-  view.dom.addEventListener(`paste`, async (event: ClipboardEvent) => {
-    if (!(event.clipboardData?.items) || isImgLoading.value) {
-      return
-    }
-    const items = await Promise.all(
-      [...event.clipboardData.items]
-        .map(item => item.getAsFile())
-        .filter(item => item != null)
-        .map(async item => (await beforeImageUpload(item!)) ? item : null),
-    )
-    const validItems = items.filter(item => item != null) as File[]
-    // 即使return了，粘贴的文本内容也会被插入
-    if (validItems.length === 0) {
-      return
-    }
-    // start progress
-    const intervalId = setInterval(() => {
-      const newProgress = progressValue.value + 1
-      if (newProgress >= 100) {
-        return
-      }
-      progressValue.value = newProgress
-    }, 100)
-    for (const item of validItems) {
-      event.preventDefault()
-      await uploadImage(item)
-    }
-    const cleanup = () => {
-      clearInterval(intervalId)
-      progressValue.value = 100 // 设置完成状态
-      // 可选：延迟一段时间后重置进度
-      setTimeout(() => {
-        progressValue.value = 0
-      }, 1000)
-    }
-    cleanup()
-  })
 
   // 返回编辑器 view
   return view
@@ -609,6 +895,8 @@ watch(isDark, () => {
       effects: themeCompartment.reconfigure(theme(isDark.value)),
     })
   }
+  // 重新渲染 markdown 以更新 infographic 等扩展的主题
+  editorRefresh()
 })
 
 // 监听当前文章切换，更新编辑器内容
@@ -664,8 +952,8 @@ onMounted(() => {
 onUnmounted(() => {
   // 清理定时器 - 防止回调访问已销毁的DOM
   clearTimeout(historyTimer.value)
-  clearTimeout(timeout.value)
   clearTimeout(changeTimer.value)
+  clearTimeout(cursorSyncTimer.value)
 
   // 清理全局事件监听器 - 防止全局事件触发已销毁的组件
   document.removeEventListener(`keydown`, handleGlobalKeydown)
@@ -684,98 +972,139 @@ onUnmounted(() => {
 
     <main class="container-main flex flex-1 flex-col">
       <div
-        class="container-main-section border-radius-10 relative flex flex-1 overflow-hidden border"
+        class="container-main-section border-radius-10 relative flex flex-1 overflow-hidden border-x border-b"
       >
         <ResizablePanelGroup direction="horizontal">
           <ResizablePanel
-            :default-size="15"
-            :max-size="isOpenPostSlider ? 20 : 0"
-            :min-size="isOpenPostSlider ? 10 : 0"
+            :default-size="isMobile ? 0 : 15"
+            :max-size="!isMobile && isOpenPostSlider ? 20 : 0"
+            :min-size="!isMobile && isOpenPostSlider ? 10 : 0"
           >
             <PostSlider />
           </ResizablePanel>
           <ResizableHandle class="hidden md:block" />
-          <ResizablePanel class="flex">
-            <div
-              v-show="!isMobile || (isMobile && showEditor)"
-              ref="codeMirrorWrapper"
-              class="codeMirror-wrapper relative flex-1"
-              :class="{
-                'order-1 border-l': !isEditOnLeft,
-                'border-r': isEditOnLeft,
-              }"
-            >
-              <SearchTab v-if="codeMirrorView" ref="searchTabRef" :editor-view="codeMirrorView as any" />
-              <SidebarAIToolbar
-                v-if="uiStore.showAIToolbox"
-                :is-mobile="isMobile"
-                :show-editor="showEditor"
-              />
+          <ResizablePanel
+            :default-size="isOpenFolderPanel ? 15 : 0"
+            :max-size="isOpenFolderPanel ? 25 : 0"
+            :min-size="isOpenFolderPanel ? 10 : 0"
+          >
+            <FolderSourcePanel />
+          </ResizablePanel>
+          <ResizableHandle v-if="isOpenFolderPanel" class="hidden md:block" />
 
-              <EditorContextMenu>
-                <div
-                  id="editor"
-                  ref="editorRef"
-                  class="codemirror-container"
-                />
-              </EditorContextMenu>
-            </div>
-            <div
-              v-show="!isMobile || (isMobile && !showEditor)"
-              class="relative flex-1 overflow-x-hidden transition-width"
-              :class="[isOpenRightSlider ? 'w-0' : 'w-100']"
-            >
-              <div
-                id="preview"
-                ref="previewRef"
-                class="preview-wrapper w-full p-5 flex justify-center"
+          <!-- 主内容区域 (嵌套灵动布局) -->
+          <ResizablePanel :min-size="30">
+            <ResizablePanelGroup direction="horizontal">
+              <!-- Markdown 编辑器 -->
+              <ResizablePanel
+                ref="editorPanelRef"
+                :order="1"
+                :default-size="viewMode === 'preview' ? 0 : viewMode === 'edit' ? 100 : 50"
+                :min-size="editorPanelConfig.min"
+                :max-size="editorPanelConfig.max"
+                collapsible
+                :collapsed-size="0"
               >
                 <div
-                  id="output-wrapper"
-                  class="w-full max-w-full"
-                  :class="{ output_night: !backLight }"
+                  v-show="viewMode !== 'preview'"
+                  ref="codeMirrorWrapper"
+                  class="codeMirror-wrapper relative h-full"
                 >
+                  <SearchTab v-if="codeMirrorView" ref="searchTabRef" :editor-view="codeMirrorView as any" />
+                  <SidebarAIToolbar
+                    :is-mobile="isMobile"
+                    :show-editor="showEditor"
+                  />
+
+                  <EditorContextMenu>
+                    <div
+                      id="editor"
+                      ref="editorRef"
+                      class="codemirror-container"
+                    />
+                  </EditorContextMenu>
+                </div>
+              </ResizablePanel>
+              <ResizableHandle v-show="viewMode === 'split'" />
+
+              <!-- 预览区 -->
+              <ResizablePanel
+                ref="previewPanelRef"
+                :order="2"
+                :default-size="viewMode === 'edit' ? 0 : viewMode === 'preview' ? 100 : 50"
+                :min-size="previewPanelConfig.min"
+                :max-size="previewPanelConfig.max"
+                collapsible
+                :collapsed-size="0"
+              >
+                <div v-show="viewMode !== 'edit'" class="relative h-full overflow-x-hidden">
                   <div
-                    class="preview border-x shadow-xl mx-auto"
-                    :class="[
-                      isMobile ? 'w-full' : previewWidth,
-                      themeStore.previewWidth === 'w-[375px]' ? 'max-w-full' : '',
-                    ]"
+                    id="preview"
+                    ref="previewRef"
+                    class="preview-wrapper w-full p-5 flex justify-center"
                   >
-                    <section id="output" class="w-full" v-html="output" />
-                    <div v-if="isCoping" class="loading-mask">
-                      <div class="loading-mask-box">
-                        <div class="loading__img" />
-                        <span>正在生成</span>
+                    <div
+                      id="output-wrapper"
+                      class="w-full max-w-full"
+                      :class="{ output_night: !backLight }"
+                    >
+                      <div
+                        class="preview border-x shadow-xl mx-auto"
+                        :class="[
+                          effectivePreviewWidth,
+                          effectivePreviewWidth === 'w-[375px]' ? 'max-w-full' : '',
+                        ]"
+                      >
+                        <section id="output" class="w-full" @click="handlePreviewContentClick" v-html="output" />
+                        <div v-if="isCoping" class="loading-mask">
+                          <div class="loading-mask-box">
+                            <div class="loading__img" />
+                            <span>正在生成</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                    <BackTop
+                      target="preview"
+                      :right="isMobile ? 24 : 20"
+                      :bottom="isMobile ? 90 : 20"
+                    />
                   </div>
                 </div>
-                <BackTop
-                  target="preview"
-                  :right="isMobile ? 24 : 20"
-                  :bottom="isMobile ? 90 : 20"
-                />
-              </div>
+              </ResizablePanel>
 
-              <FloatingToc />
-            </div>
-            <CssEditor />
-            <RightSlider />
+              <!-- CSS 编辑器面板 -->
+              <ResizableHandle v-if="!isMobile && uiStore.isShowCssEditor" class="hidden md:block" />
+              <ResizablePanel
+                v-if="!isMobile && uiStore.isShowCssEditor"
+                :order="3"
+                :default-size="25"
+                :min-size="10"
+                :max-size="60"
+              >
+                <CssEditor />
+              </ResizablePanel>
+
+              <!-- 样式面板 -->
+              <ResizableHandle v-if="!isMobile && isOpenRightSlider" class="hidden md:block" />
+              <ResizablePanel
+                v-if="!isMobile && isOpenRightSlider"
+                :order="4"
+                :default-size="40"
+                :min-size="25"
+                :max-size="60"
+              >
+                <RightSlider />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+
+            <!-- 移动端：CssEditor 和 RightSlider 作为浮层 -->
+            <template v-if="isMobile">
+              <CssEditor />
+              <RightSlider />
+            </template>
           </ResizablePanel>
         </ResizablePanelGroup>
-      </div>
-
-      <!-- 移动端浮动按钮组 -->
-      <div v-if="isMobile" class="fixed bottom-16 right-6 z-50 flex flex-col gap-2">
-        <!-- 切换编辑/预览按钮 -->
-        <button
-          class="bg-primary flex items-center justify-center rounded-full p-3 text-white shadow-lg transition active:scale-95 hover:scale-105 dark:bg-gray-700 dark:text-white dark:ring-2 dark:ring-white/30"
-          aria-label="切换编辑/预览"
-          @click="toggleView"
-        >
-          <component :is="showEditor ? Eye : Pen" class="h-5 w-5" />
-        </button>
       </div>
 
       <!-- AI工具箱已移到侧边栏，这里不再显示 -->
@@ -785,6 +1114,8 @@ onUnmounted(() => {
       <InsertFormDialog />
 
       <InsertMpCardDialog />
+
+      <ImportMarkdownDialog />
 
       <TemplateDialog />
 
@@ -799,7 +1130,7 @@ onUnmounted(() => {
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction @click="resetStyle">
-              确认
+              确定
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -863,6 +1194,15 @@ onUnmounted(() => {
 .codeMirror-wrapper,
 .preview-wrapper {
   height: 100%;
+}
+
+.preview-wrapper {
+  overflow-y: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .codeMirror-wrapper {

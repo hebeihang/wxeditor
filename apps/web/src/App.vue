@@ -15,12 +15,25 @@ onMounted(() => {
   if (isUtools.value) {
     document.documentElement.classList.add(`is-utools`)
   }
+
+  // 若 URL 带有 open 参数（Markdown 链接），打开导入对话框并自动导入
+  const params = new URLSearchParams(window.location.search)
+  const openUrl = params.get(`open`)
+  if (openUrl && URL.canParse(openUrl) && /^https?:\/\//i.test(openUrl)) {
+    uiStore.importMdOpenUrl = openUrl
+    uiStore.isShowImportMdDialog = true
+    params.delete(`open`)
+    const newSearch = params.toString()
+    const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : ``) + window.location.hash
+    window.history.replaceState({}, ``, newUrl)
+  }
 })
 </script>
 
 <template>
   <AppSplash />
   <CodemirrorEditor />
+
   <Toaster
     rich-colors
     position="top-center"
@@ -46,17 +59,21 @@ body {
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
-  background-color: rgba(243, 244, 247, 0.5);
+  background-color: transparent;
 }
 
 ::-webkit-scrollbar-track {
   border-radius: 6px;
-  background-color: rgba(200, 200, 200, 0.3);
+  background-color: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   border-radius: 6px;
-  background-color: rgba(144, 146, 152, 0.5);
+  background-color: #dadada;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #424242;
 }
 
 // Utools 模式下隐藏所有滚动条
@@ -91,9 +108,7 @@ body {
 
   color: #333333;
   background-color: #ffffff;
-  box-shadow:
-    0 4px 8px 0 rgba(0, 0, 0, 0.12),
-    0 2px 4px 0 rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.12), 0 2px 4px 0 rgba(0, 0, 0, 0.08);
 }
 
 .CodeMirror-hint {

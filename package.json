@@ -20,6 +20,7 @@
     "start": "pnpm web dev",
     "web": "pnpm --filter @md/web",
     "vscode": "pnpm --prefix ./apps/vscode",
+    "mcp": "pnpm --filter @md/mcp-server",
     "cli": "pnpm --filter @doocs/md-cli",
     "build:cli": "pnpm web build && npx shx rm -rf packages/md-cli/dist && npx shx rm -rf dist/**/*.map && npx shx cp -r apps/web/dist packages/md-cli/ && cd packages/md-cli && npm pack",
     "release:cli": "node ./scripts/release.js",
@@ -30,35 +31,24 @@
     "utools:package": "node ./scripts/package-utools.mjs"
   },
   "dependencies": {
-    "@codemirror/state": "^6.5.2",
-    "@codemirror/view": "6.38.8"
+    "@antv/infographic": "^0.2.16",
+    "@codemirror/state": "6.6.0",
+    "@codemirror/view": "6.40.0",
+    "lucide-vue-next": "^1.0.0"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "6.2.0",
-    "@types/node": "^24.10.1",
+    "@antfu/eslint-config": "8.0.0",
+    "@types/node": "^25.5.2",
     "archiver": "^7.0.1",
     "cross-env": "^10.1.0",
-    "eslint": "^9.39.1",
-    "eslint-plugin-format": "^1.0.2",
-    "npm-run-all": "^4.1.5",
+    "eslint": "^10.2.0",
+    "eslint-plugin-format": "^2.0.1",
+    "npm-run-all2": "^8.0.4",
     "prettier": "2.8.8",
     "shx": "^0.4.0",
     "simple-git-hooks": "^2.13.1",
     "typescript": "~5.9.3",
     "vue-tsc": "^2.1.6"
-  },
-  "pnpm": {
-    "overrides": {
-      "@codemirror/view": "6.38.8",
-      "core-js@<3": "^3.46.0",
-      "glob@<8": "^10.4.5",
-      "inflight": "npm:@hishprorg/voluptates-laborum@^2.0.0",
-      "source-map@0.8.0-beta.0": "0.7.4",
-      "workbox-build>source-map": "0.7.4"
-    },
-    "patchedDependencies": {
-      "@codemirror/view@6.38.8": "patches/@codemirror__view@6.38.8.patch"
-    }
   },
   "simple-git-hooks": {
     "pre-commit": "npx lint-staged"

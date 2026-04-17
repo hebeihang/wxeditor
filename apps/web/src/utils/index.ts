@@ -53,6 +53,29 @@ export function downloadMD(doc: string, title: string = `untitled`) {
 }
 
 /**
+ * 批量导出多篇文章为 ZIP
+ * @param posts - 文章列表（含 title 和 content）
+ */
+export async function exportPostsAsZip(posts: Array<{ title: string, content: string }>) {
+  const JSZip = (await import(`jszip`)).default
+  const zip = new JSZip()
+  posts.forEach(({ title, content }) => {
+    const safeTitle = sanitizeTitle(title)
+    zip.file(`${safeTitle}.md`, content)
+  })
+  const blob = await zip.generateAsync({ type: `blob` })
+  const date = new Date().toISOString().slice(0, 10)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement(`a`)
+  a.href = url
+  a.download = `posts-${date}.zip`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/**
  * 获取 HTML 内容
  * @returns {string} HTML 字符串
  */
@@ -122,70 +145,62 @@ export async function exportPDF(title: string = `untitled`) {
   const stylesToAdd = await getStylesToAdd()
   const safeTitle = sanitizeTitle(title)
 
-  // 创建新窗口用于打印
-  const printWindow = window.open(``, `_blank`)
-  if (!printWindow) {
-    console.error(`无法打开打印窗口`)
-    return
-  }
-
-  // 写入HTML内容，包含主题样式和自定义页眉页脚
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>${safeTitle}</title>
-      ${stylesToAdd}
-      <style>
-        /* 强制打印背景颜色和图片 */
-        * {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-          color-adjust: exact !important;
-        }
-
-        /* 打印页面设置 */
-        @page {
-          @top-center {
-            content: "${safeTitle}";
-            font-size: 12px;
-            color: #666;
-          }
-          @bottom-left {
-            content: "微信 Markdown 编辑器";
-            font-size: 10px;
-            color: #999;
-          }
-          @bottom-right {
-            content: "第 " counter(page) " 页，共 " counter(pages) " 页";
-            font-size: 10px;
-            color: #999;
-          }
-        }
-
-        @media print {
-          body { margin: 0; }
-        }
-      </style>
-    </head>
-    <body>
-      <div style="width: 100%; max-width: 750px; margin: auto;">
-        ${htmlStr}
-      </div>
-    </body>
-    </html>
-  `)
-
-  printWindow.document.close()
-
-  // 等待内容加载完成后自动打开打印对话框
-  printWindow.onload = () => {
-    printWindow.print()
-    // 打印完成后关闭窗口
-    printWindow.onafterprint = () => {
-      printWindow.close()
+  const printHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${safeTitle}</title>
+  ${stylesToAdd}
+  <style>
+    /* 强制打印背景颜色和图片 */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
     }
+
+    /* 打印页面设置 */
+    @page {
+      @top-center {
+        content: "${safeTitle}";
+        font-size: 12px;
+        color: #666;
+      }
+      @bottom-left {
+        content: "https://md.doocs.org";
+        font-size: 10px;
+        color: #999;
+      }
+      @bottom-right {
+        content: "第 " counter(page) " 页，共 " counter(pages) " 页";
+        font-size: 10px;
+        color: #999;
+      }
+    }
+
+    @media print {
+      body { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div style="width: 100%; max-width: 750px; margin: auto;">
+    ${htmlStr}
+  </div>
+</body>
+</html>`
+  const iframe = document.createElement(`iframe`)
+  iframe.style.cssText = `position:fixed;width:0;height:0;top:-9999px;left:-9999px;border:none;`
+  iframe.srcdoc = printHtml
+  document.body.appendChild(iframe)
+
+  iframe.onload = () => {
+    iframe.contentWindow?.focus()
+    iframe.contentWindow?.print()
+    // 延迟移除，确保打印完成
+    setTimeout(() => {
+      document.body.removeChild(iframe)
+    }, 500)
   }
 }
 
@@ -354,4 +369,28 @@ export async function processClipboardContent(primaryColor: string) {
       /<tspan([^>]*)>/g,
       `<tspan$1 style="fill: #333333 !important; color: #333333 !important; stroke: none !important;">`,
     )
+
+  // fix: antv infographic 复制到微信公众平台时 <text></text> 被自动转为 <text><tspan></tspan></text> 导致在 Safari 浏览器中文字异常的问题
+  clipboardDiv.querySelectorAll('.infographic-diagram').forEach((diagram) => {
+    diagram.querySelectorAll('text').forEach((textElem) => {
+      // 如果有 dominant-baseline 属性，替换为 dy
+      const dominantBaseline = textElem.getAttribute('dominant-baseline')
+      const variantMap = {
+        'alphabetic': '',
+        'central': '0.35em',
+        'middle': '0.35em',
+        'hanging': '-0.55em',
+        'ideographic': '0.18em',
+        'text-before-edge': '-0.85em',
+        'text-after-edge': '0.15em',
+      }
+      if (dominantBaseline) {
+        textElem.removeAttribute('dominant-baseline')
+        const dy = variantMap[dominantBaseline as keyof typeof variantMap]
+        if (dy) {
+          textElem.setAttribute('dy', dy)
+        }
+      }
+    })
+  })
 }

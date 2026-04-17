@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type {
+  HeadingLevel,
+  HeadingStyleType,
   themeMap,
 } from '@md/shared/configs'
 import type { Format } from 'vue-pick-colors'
@@ -8,16 +10,21 @@ import {
   colorOptions,
   fontFamilyOptions,
   fontSizeOptions,
+  headingLevelOptions,
+  headingStyleOptions,
   legendOptions,
   themeOptions,
 } from '@md/shared/configs'
 import { X } from 'lucide-vue-next'
 import PickColors from 'vue-pick-colors'
+import { useCssEditorStore } from '@/stores/cssEditor'
 import { useEditorStore } from '@/stores/editor'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 
+const cssEditorStore = useCssEditorStore()
+const uiStore = useUIStore()
 const themeStore = useThemeStore()
 const {
   theme,
@@ -33,7 +40,28 @@ const {
   isUseJustify,
 } = storeToRefs(themeStore)
 
-const uiStore = useUIStore()
+// 标题样式选择器状态
+const selectedHeadingLevel = ref<HeadingLevel>(`h2`)
+const selectedHeadingStyle = computed({
+  get: () => themeStore.getHeadingStyle(selectedHeadingLevel.value),
+  set: (val: HeadingStyleType) => {
+    themeStore.setHeadingStyle(selectedHeadingLevel.value, val)
+    if (val === `custom`) {
+      // 打开 CSS 编辑器并滚动到对应标题区域
+      uiStore.isShowCssEditor = true
+      // 等待 CSS 编辑器打开后再滚动
+      nextTick(() => {
+        setTimeout(() => {
+          cssEditorStore.scrollToHeading(selectedHeadingLevel.value)
+        }, 100)
+      })
+    }
+    // 无论选择预设还是自定义，都立即应用主题，确保标题样式及时恢复/更新
+    themeStore.applyCurrentTheme()
+    editorRefresh()
+  },
+})
+
 const { isMobile, isOpenRightSlider, isDark } = storeToRefs(uiStore)
 
 const editorStore = useEditorStore()
@@ -44,15 +72,7 @@ function editorRefresh() {
   themeStore.updateCodeTheme()
 
   const raw = editorStore.getContent()
-  renderStore.render(raw, {
-    isCiteStatus: themeStore.isCiteStatus,
-    legend: themeStore.legend,
-    isUseIndent: themeStore.isUseIndent,
-    isUseJustify: themeStore.isUseJustify,
-    isCountStatus: themeStore.isCountStatus,
-    isMacCodeBlock: themeStore.isMacCodeBlock,
-    isShowLineNumber: themeStore.isShowLineNumber,
-  })
+  renderStore.render(raw)
 }
 
 // Theme change handlers
@@ -167,30 +187,16 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
   />
 
   <div
-    class="overflow-hidden mobile-right-drawer"
+    class="h-full overflow-hidden"
     :class="{
-      // 移动端样式
-      'fixed top-0 right-0 w-full h-full z-55 bg-background border-l shadow-lg': isMobile,
+      'fixed top-0 right-0 w-full h-full z-55 bg-background border-l shadow-lg mobile-right-drawer': isMobile,
       'animate': isMobile && enableAnimation,
-      // 桌面端样式
-      'border-l-2 order-2 border-gray/20 bg-white transition-width duration-300 dark:bg-[#191919]': !isMobile,
-      'w-100': !isMobile && isOpenRightSlider,
-      'w-0 border-l-0': !isMobile && !isOpenRightSlider,
     }"
-    :style="{
-      transform: isMobile ? (isOpenRightSlider ? 'translateX(0)' : 'translateX(100%)') : 'none',
-    }"
+    :style="isMobile ? { transform: isOpenRightSlider ? 'translateX(0)' : 'translateX(100%)' } : undefined"
   >
     <div
       class="space-y-4 h-full overflow-auto p-4"
-      :class="{
-        // 移动端不需要额外的transform
-        'pt-0': isMobile,
-        // 桌面端保持原有的动画
-        'transition-transform': !isMobile,
-        'translate-x-0': !isMobile && isOpenRightSlider,
-        'translate-x-full': !isMobile && !isOpenRightSlider,
-      }"
+      :class="{ 'pt-0': isMobile }"
     >
       <!-- 移动端标题栏 -->
       <div v-if="isMobile" class="sticky top-0 z-10 flex items-center justify-between -mx-4 px-4 py-3 border-b mb-4 bg-background">
@@ -261,6 +267,31 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
             :format-options="formatOptions" :theme="isDark ? 'dark' : 'light'"
             :popup-container="pickColorsContainer" @change="colorChanged"
           />
+        </div>
+      </div>
+      <div class="space-y-2">
+        <h2>标题样式</h2>
+        <div class="flex gap-2">
+          <Select v-model="selectedHeadingLevel">
+            <SelectTrigger class="w-[120px]">
+              <SelectValue placeholder="选择标题" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="{ label, value } in headingLevelOptions" :key="value" :value="value">
+                {{ label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-model="selectedHeadingStyle">
+            <SelectTrigger class="flex-1">
+              <SelectValue placeholder="选择样式" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="{ label, value } in headingStyleOptions" :key="value" :value="value">
+                {{ label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <div class="space-y-2">

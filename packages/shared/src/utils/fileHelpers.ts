@@ -1,11 +1,9 @@
-// @ts-expect-error - prettier v2.8.8 doesn't have proper TypeScript declarations
+/*
 import parserBabel from 'prettier/parser-babel'
-// @ts-expect-error - prettier v2.8.8 doesn't have proper TypeScript declarations
 import parserMarkdown from 'prettier/parser-markdown'
-// @ts-expect-error - prettier v2.8.8 doesn't have proper TypeScript declarations
 import parserPostcss from 'prettier/parser-postcss'
-// @ts-expect-error - prettier v2.8.8 doesn't have proper TypeScript declarations
 import * as prettier from 'prettier/standalone'
+*/
 
 /**
  * 通用文件下载函数
@@ -92,7 +90,9 @@ export function createTable({ data, rows, cols }: {
  * @param type - 内容类型，决定使用的解析器，默认为 'markdown'
  * @returns 格式化后的内容
  */
-export async function formatDoc(content: string, type: `markdown` | `css` | `javascript` = `markdown`): Promise<string> {
+export async function formatDoc(content: string, _type: `markdown` | `css` | `javascript` = `markdown`): Promise<string> {
+  return content
+  /*
   const parser = type === `css` ? `css` : type === `javascript` ? `babel` : `markdown`
   const plugins = type === `css` ? [parserPostcss] : type === `javascript` ? [parserBabel] : [parserMarkdown, parserBabel]
 
@@ -114,4 +114,5 @@ export async function formatDoc(content: string, type: `markdown` | `css` | `jav
     htmlWhitespaceSensitivity: `css`,
     endOfLine: `lf`,
   })
+  */
 }

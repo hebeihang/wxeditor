@@ -3,6 +3,7 @@ import {
   ChevronRight,
   Edit3,
   Ellipsis,
+  FileDown,
   FileInput,
   History,
   Package,
@@ -12,6 +13,7 @@ import {
 import { usePostStore } from '@/stores/post'
 import { useTemplateStore } from '@/stores/template'
 import { useUIStore } from '@/stores/ui'
+import { downloadMD } from '@/utils'
 
 interface Post {
   id: string
@@ -52,6 +54,12 @@ const props = defineProps<{
   handleDragEnd: () => void
   // 以添加子文章的方式打开对话框
   openAddPostDialog: (parentId: string) => void
+  // 选择模式
+  isSelectMode?: boolean
+  // 已选 ID 列表
+  selectedIds?: string[]
+  // 切换选中
+  onToggleSelect?: (id: string) => void
 }>()
 
 const postStore = usePostStore()
@@ -116,55 +124,76 @@ function applyTemplate(postId: string) {
 
 <template>
   <div v-for="post in props.sortedPosts.filter(p => (props.parentId == null && p.parentId == null) || p.parentId === props.parentId)" :key="post.id">
-    <!-- 根文章外层容器 -->
+    <!-- 文章项容器 -->
     <a
-      class="w-full inline-flex cursor-pointer items-center gap-1 rounded p-2 text-sm transition-colors"
-      :class="[
-        // eslint-disable-next-line vue/prefer-separate-static-class
-        'hover:text-primary-foreground hover:bg-primary',
-        {
-          'bg-primary text-primary-foreground shadow-sm': currentPostId === post.id,
-          'opacity-50': props.dragSourceId === post.id,
-          'outline-2 outline-dashed outline-primary  border-gray-200 bg-gray-400/50 dark:border-gray-200 dark:bg-gray-500/50':
-            props.dropTargetId === post.id,
-        },
-      ]"
-      draggable="true"
-      @dragstart="handleDragStart(post.id, $event)"
+      class="post-item group relative flex w-full cursor-pointer items-center gap-1 rounded-lg px-2 py-[7px] text-[13px] leading-snug transition-all duration-150 ease-out"
+      :class="{
+        'bg-accent text-accent-foreground font-medium active-item': !props.isSelectMode && currentPostId === post.id,
+        'text-foreground/70 hover:text-foreground hover:bg-accent/50': props.isSelectMode ? true : currentPostId !== post.id,
+        'opacity-30': props.dragSourceId === post.id,
+        'ring-1 ring-primary/40 ring-inset bg-primary/5': props.dropTargetId === post.id,
+      }"
+      :draggable="!props.isSelectMode"
+      @dragstart="!props.isSelectMode && handleDragStart(post.id, $event)"
       @dragend="props.handleDragEnd"
-      @drop.prevent="props.handleDrop(post.id)"
-      @dragover.stop.prevent="props.setDropTargetId(post.id)"
+      @drop.prevent="!props.isSelectMode && props.handleDrop(post.id)"
+      @dragover.stop.prevent="!props.isSelectMode && props.setDropTargetId(post.id)"
       @dragleave.prevent="props.setDropTargetId(null)"
-      @click="currentPostId = post.id"
+      @click="props.isSelectMode ? props.onToggleSelect?.(post.id) : (currentPostId = post.id)"
     >
+      <!-- 活动指示条 -->
+      <span
+        v-if="!props.isSelectMode && currentPostId === post.id"
+        class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary"
+      />
+
+      <!-- 选择模式复选框 -->
+      <span
+        v-if="props.isSelectMode"
+        class="flex shrink-0 items-center justify-center size-5"
+        @click.stop="props.onToggleSelect?.(post.id)"
+      >
+        <span
+          class="flex items-center justify-center size-4 rounded border transition-colors duration-150"
+          :class="props.selectedIds?.includes(post.id)
+            ? 'bg-primary border-primary text-primary-foreground'
+            : 'border-border bg-background'"
+        >
+          <svg v-if="props.selectedIds?.includes(post.id)" class="size-2.5" viewBox="0 0 10 10" fill="none">
+            <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+      </span>
+
       <!-- 折叠展开图标 -->
-      <Button
-        size="xs"
-        variant="ghost"
-        class="h-max p-0.5"
-        :class="isHasChild(post.id) ? 'opacity-100' : 'opacity-0'"
+      <button
+        v-if="!props.isSelectMode"
+        class="flex shrink-0 items-center justify-center size-5 rounded text-muted-foreground/50 transition-colors duration-150"
+        :class="{
+          'hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5': isHasChild(post.id),
+          'invisible': !isHasChild(post.id),
+        }"
         @click.stop="isHasChild(post.id) && togglePostExpanded(post.id)"
       >
         <ChevronRight
-          class="size-4 transition-transform"
+          class="size-3.5 transition-transform duration-200 ease-out"
           :class="{ 'rotate-90': !post.collapsed }"
         />
-      </Button>
+      </button>
 
-      <span class="line-clamp-1">{{ post.title }}</span>
+      <span class="flex-1 truncate select-none">{{ post.title }}</span>
 
-      <!-- 每条文章操作 -->
-      <DropdownMenu>
+      <!-- 上下文菜单 — hover 时渐入 -->
+      <DropdownMenu v-if="!props.isSelectMode">
         <DropdownMenuTrigger as-child>
-          <Button
-            size="xs"
-            variant="ghost"
-            class="ml-auto h-max p-0.5"
+          <button
+            class="ml-auto flex shrink-0 items-center justify-center size-6 rounded-md text-muted-foreground/40 opacity-0 transition-all duration-150 group-hover:opacity-100 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 data-[state=open]:opacity-100 data-[state=open]:text-foreground"
+            @click.stop
           >
             <Ellipsis class="size-4" />
-          </Button>
+          </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent align="start" class="w-40">
           <DropdownMenuItem @click.stop="props.openAddPostDialog(post.id)">
             <PlusSquare class="mr-2 size-4" /> 新增内容
           </DropdownMenuItem>
@@ -173,6 +202,10 @@ function applyTemplate(postId: string) {
           </DropdownMenuItem>
           <DropdownMenuItem @click.stop="props.openHistoryDialog(post.id)">
             <History class="mr-2 size-4" /> 历史记录
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem @click.stop="downloadMD(post.content, post.title)">
+            <FileDown class="mr-2 size-4" /> 导出 .md
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem @click.stop="saveAsTemplate(post.id)">
@@ -184,6 +217,7 @@ function applyTemplate(postId: string) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             v-if="posts.length > 1"
+            class="text-destructive focus:text-destructive"
             @click.stop="props.startDelPost(post.id)"
           >
             <Trash2 class="mr-2 size-4" /> 删除
@@ -192,9 +226,10 @@ function applyTemplate(postId: string) {
       </DropdownMenu>
     </a>
 
+    <!-- 子级树 -->
     <div
       v-if="isHasChild(post.id) && !post.collapsed"
-      class="space-y-1 ml-4 mt-1 border-l-2 border-gray-300 pl-1 dark:border-gray-700"
+      class="ml-[18px] border-l border-border/40 pl-2 py-0.5"
     >
       <PostItem
         :parent-id="post.id"
@@ -209,6 +244,9 @@ function applyTemplate(postId: string) {
         :handle-drag-end="props.handleDragEnd"
         :handle-drop="props.handleDrop"
         :open-add-post-dialog="props.openAddPostDialog"
+        :is-select-mode="props.isSelectMode"
+        :selected-ids="props.selectedIds"
+        :on-toggle-select="props.onToggleSelect"
       />
     </div>
   </div>
