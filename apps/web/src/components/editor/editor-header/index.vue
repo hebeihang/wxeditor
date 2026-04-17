@@ -261,7 +261,6 @@ function handleCopy(mode: string) {
         <FormatDropdown />
         <InsertDropdown />
         <StyleDropdown />
-        <ViewDropdown />
         <MenubarMenu>
           <MenubarTrigger>
             AI
@@ -364,7 +363,6 @@ function handleCopy(mode: string) {
             <FormatDropdown :as-sub="true" />
             <InsertDropdown :as-sub="true" />
             <StyleDropdown :as-sub="true" />
-            <ViewDropdown :as-sub="true" />
             <MenubarSub>
               <MenubarSubTrigger>
                 AI

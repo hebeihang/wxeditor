@@ -12,14 +12,14 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
-    "@md/core": "workspace:*",
-    "@md/shared": "workspace:*",
+    "@md/core": "file:../core",
+    "@md/shared": "file:../shared",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "tsx": "^4.21.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^25.5.2",
-    "typescript": "~5.9.3"
+    "@types/node": "^25.6.0",
+    "typescript": "~6.0.2"
   }
 }

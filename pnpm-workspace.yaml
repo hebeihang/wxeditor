@@ -1,26 +1,26 @@
 shellEmulator: true
 
-trustPolicy: no-downgrade
+trustPolicy: allow-downgrade
 packages:
   - apps/*
   - packages/*
 
 overrides:
-  '@codemirror/state': 6.6.0
-  '@codemirror/view': 6.40.0
+  "@codemirror/state": 6.6.0
+  "@codemirror/view": 6.41.0
   ajv@^8: ^8.18.0
-  bn.js: '>=5.2.3'
+  bn.js: ">=5.2.3"
   bn.js@^5: ^5.2.3
   confbox: 0.2.2
   core-js: ^3.48.0
   cross-spawn@<7: ^7.0.6
   crypto-browserify: npm:empty-module@0.0.2
-  dompurify@<3.3.2: ^3.3.2
+  dompurify@<3.4.0: ^3.4.0
   flatted@<3.4.0: ^3.4.0
   glob@<8: ^10.5.0
   glob@^10: ^10.5.0
   inflight: npm:@hishprorg/voluptates-laborum@^2.0.0
-  juice: 11.0.3
+
   lodash-es: ^4.17.23
   markdown-it: ^14.1.1
   minimatch: ^10.2.4
@@ -39,4 +39,5 @@ overrides:
   yauzl: ^3.2.1
 
 patchedDependencies:
-  '@codemirror/view@6.40.0': patches/@codemirror__view@6.40.0.patch
+  "@codemirror/view@6.41.0": patches/@codemirror__view@6.41.0.patch
+  juice@11.1.1: patches/juice@11.1.1.patch
